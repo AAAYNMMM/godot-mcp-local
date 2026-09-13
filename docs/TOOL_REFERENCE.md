@@ -133,7 +133,7 @@ Use `batch.execute_transaction` when every requested mutation is reversible. If 
 
 ### World authoring
 
-Use `world.manage` and select an advertised TileMap/TileSet, GridMap, or CSG `op`. The v0.5 real Connector acceptance verified cell/item mutation, bounded reads, Undo/Redo, atlas metadata/image content, MeshLibrary listing, and CSG operation changes.
+Use `world.manage` and select an advertised TileMap/TileSet, GridMap, or CSG `op`. The inherited v0.5 capability regression verified cell/item mutation, bounded reads, Undo/Redo, atlas metadata/image content, MeshLibrary listing, and CSG operation changes.
 
 ### Third-party Custom Tools
 
@@ -143,14 +143,22 @@ Custom tools register from a real addon, must bind handlers to that addon, decla
 
 v0.5 regression coverage includes path traversal/project-external rejection, resource/path validation, scene-root deletion denial, bounded diagnostics/images/input/log/test payloads, transaction rollback classification, Custom Tool ownership/schema/enablement checks, and no generic arbitrary-shell MCP tool.
 
-## Real validation
+## Local validation
 
-The final real Web ChatGPT Connector regression on **2026-09-10** used Godot **4.7.2-stable (official)** and verified the compact surface through the actual Web ChatGPT → Secure MCP Tunnel → Godot Editor/Runtime path. It included real screenshot image content and Custom Tool promotion from 47 to 48 tools, then back to 47 after disable.
+The local edition has been exercised through a real Godot **4.7.2-stable (official)** Editor Plugin instance and direct Streamable HTTP MCP requests on loopback.
 
 ```text
-CATALOGUE_SCHEMA_GATE=PASS tools=47
-COMPACT_TOOL_SURFACE_GATE=PASS public=47 atomic=230
-REAL_CHATGPT_GODOT_MCP_0_5_TEST=PASS
+PLUGIN_LOAD=PASS
+LOCAL_LISTEN_127_0_0_1_39050=PASS
+MCP_INITIALIZE=PASS
+TOOLS_LIST=PASS tools=47
+GODOT_GET_STATUS=PASS
+JSON_RESPONSE=PASS
+SSE_RESPONSE=PASS
+BROWSER_ORIGIN_REJECT=PASS status=403
+GDSCRIPT_LOAD=PASS scripts=29 failures=0
 ```
+
+Historical v0.5 capability work established the compact 47-public-tool / 230-atomic-command surface. The local conversion changes transport and packaging, not the intended Godot capability surface.
 
 See [Examples](EXAMPLES.md), [Quick Start](QUICKSTART.md), and [Security](../SECURITY.md).

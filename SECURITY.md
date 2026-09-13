@@ -1,191 +1,113 @@
-# Security
+# Security Policy
 
-[English] | [简体中文](SECURITY.zh-CN.md)
+English | [简体中文](SECURITY.zh-CN.md)
 
-`godot-mcp-chatgpt` lets an authorized remote ChatGPT Connector read and change a live Godot project. Version 0.4.0 therefore treats filesystem reach, credential storage, runtime control, process execution, and destructive operations as explicit security boundaries.
+`godot-mcp-local` gives a local MCP client substantial control over a live Godot project. Treat the MCP endpoint as a privileged local development interface.
 
-## 0.4.0 runtime path
+## Trust model
+
+The supported deployment is:
 
 ```text
-ChatGPT
- -> OpenAI Secure MCP Tunnel
- -> official OpenAI tunnel-client
- -> random 127.0.0.1 Streamable HTTP MCP endpoint
- -> Godot CommandRegistry
- -> Godot Editor API
-      or
- -> EditorDebuggerPlugin -> EngineDebugger -> running game
+local MCP client
+      |
+      | 127.0.0.1 only
+      v
+Godot MCP Local
+      |
+      v
+current Godot project/editor/runtime
 ```
 
-The addon does not implement the OpenAI tunnel wire protocol itself.
+Security assumptions:
 
-## Local MCP exposure
+- the MCP client runs on the same computer as Godot;
+- the listener remains bound to loopback;
+- the user trusts local development tools that can connect to that port;
+- command-layer path, schema, and destructive-operation checks remain enabled.
 
-The Godot-hosted MCP server:
+There is no remote authentication because remote connectivity is intentionally out of scope.
+
+## Network boundary
+
+The MCP server:
 
 - binds only to `127.0.0.1`;
-- chooses a random high port per run;
-- chooses a random URL path per run;
-- is intended only as the local backend for the bundled official tunnel client;
-- does not intentionally listen on LAN/public interfaces.
+- defaults to port `39050` and path `/mcp`;
+- rejects browser-origin requests carrying `Origin` or `Sec-Fetch-*` style headers;
+- does not contain a public relay, reverse proxy, tunnel client, API key, OAuth flow, or credential store.
 
-## Runtime API Key handling
+**Do not** change the bind address to `0.0.0.0`, expose the port through LAN/WAN forwarding, publish it through a tunnel, or place it behind a reverse proxy without first adding a new authenticated remote-access design.
 
-On Windows 0.4.0:
+Loopback binding is a local boundary, not a substitute for authentication on a remote network.
 
-- Tunnel ID is persisted in Godot `EditorSettings`;
-- Runtime API Key is stored as a **Windows Generic Credential** in Windows Credential Manager;
-- the plugin-specific credential target is `godot-mcp-chatgpt/0.4/OpenAI/Tunnel/APIKey`;
-- the plaintext key is not written into `project.godot`, Git, or the generated tunnel YAML profile;
-- the generated profile references `env:CONTROL_PLANE_API_KEY`;
-- Godot temporarily sets that environment variable while spawning the official `tunnel-client`, then removes it from the parent Godot process environment and clears its in-memory copy;
-- the child `tunnel-client` necessarily inherits the environment value while it is running;
-- **Forget Saved Credentials** removes both the saved Tunnel ID and the Windows Credential Manager entry.
+## Godot/project boundary
 
-A sufficiently privileged process running as the same Windows user may be able to inspect another process environment while the tunnel client is alive. Credential Manager persistence protects the key from project/Git/config-file leakage; it is not a sandbox against a compromised local account.
+The tool layer continues to validate project-relative paths and structured arguments. Project and resource mutations are intended to remain inside the current Godot project, primarily `res://`.
 
-Use a dedicated restricted Runtime API Key with only the tunnel permissions required by the intended OpenAI workspace.
+Do not add generic arbitrary-shell or unrestricted filesystem tools to the public MCP surface without a separate review.
 
-## Filesystem boundary
+## Browser-to-localhost defense
 
-Project file and Resource tools operate inside `res://`.
+Localhost services can be targeted by malicious websites. The server therefore rejects requests that present browser-origin headers. This reduces drive-by browser access to the fixed local endpoint.
 
-0.4.0 explicitly rejects:
+This check is defense-in-depth. If the endpoint ever becomes remotely reachable, use real authentication and authorization instead of relying on header checks.
 
-- `res://../...` traversal;
-- Windows/absolute project-external file paths;
-- invalid Resource source/target paths before Resource load/save.
+## Tool safety
 
-The real ChatGPT Connector regression verified these boundaries. Expanding filesystem access outside `res://` requires separate security review.
+Public tools retain read-only/destructive annotations where available and validate their input schema before invoking internal commands. Mutation commands should:
 
-## Scene and node safeguards
+- stay scoped to the current project;
+- preserve Undo/Redo where the existing Godot integration supports it;
+- validate node/resource paths and expected types;
+- keep output and image capture bounded;
+- avoid arbitrary process execution.
 
-Examples:
+## Runtime bridge
 
-- `scene.create` refuses to overwrite an existing scene unless `overwrite: true` is supplied;
-- `node.delete` refuses to delete the edited scene root;
-- invalid Node classes/properties/methods return errors rather than falling back to arbitrary behavior;
-- signal/group/metadata edits remain scoped to the current Godot project/scene.
+Runtime control travels through Godot's debugger channel and the reserved `GodotMCPLocalRuntime` autoload. Runtime mutations can change the live game immediately and may cause crashes if a caller invokes unsafe project methods.
 
-## Runtime Debugger boundary
+The runtime API should remain explicit and bounded. Do not expose arbitrary native memory access or host process APIs.
 
-0.4.0 adds a runtime bridge using Godot's own debugger channel:
+## Diagnostics helper
 
-```text
-EditorDebuggerPlugin
- <-> Godot remote-debug session
- <-> EngineDebugger
- <-> GodotMCPChatGPTRuntime autoload
-```
+The bundled Windows diagnostics runner can launch the current Godot executable with bounded arguments and captures stdout/stderr. Its implementation is intentionally narrow:
 
-The bridge does not open a second public network listener. Runtime changes affect the running instance; they are not automatically written back to the saved editor scene.
+- executable is resolved from the running Godot installation;
+- scene paths are validated within `res://`;
+- timeout and output size are capped;
+- user arguments have count/length limits;
+- it is not a general shell command tool.
 
-The reserved autoload is removed when the editor plugin is disabled and supports Godot 4.7.2 `uid://` path normalization.
+Source is in `tools/run-helper/`.
 
-## Diagnostics boundary
+## Screenshots and data exposure
 
-`diagnostics.run_capture` is deliberately not a generic process/shell tool.
+Screenshot tools return selected Godot editor/game image content, not arbitrary desktop capture. Logs and project inspection may still contain sensitive project data; only connect local clients you trust.
 
-It can only launch:
+## Custom tools
 
-- the current Godot executable;
-- against the current project;
-- with an optional project-local `res://` scene;
-- with bounded timeout and output size.
+Third-party Custom Tools execute inside the Godot editor process. Enabling one expands the effective MCP capability surface. Review custom addon code before enabling it.
 
-It returns separate stdout/stderr, exit code, timeout state, duration and truncation state.
+## Reporting a vulnerability
 
-## Batch boundary
+For a security issue, avoid posting exploit details, private project contents, or secrets in a public issue. Provide the smallest reproducible description possible and state:
 
-`batch.execute`:
+- affected version/commit;
+- Godot version and OS;
+- whether the issue crosses the loopback/project boundary;
+- exact tool or endpoint involved;
+- expected versus actual behavior.
 
-- has a bounded operation count and payload size;
-- executes existing registered MCP tools only;
-- rejects recursive `batch.*` invocation;
-- can stop on the first error;
-- is **non-atomic** and does not roll back earlier successful operations.
+## Security-sensitive changes
 
-## Installer boundary
+Changes to any of the following require explicit review and regression testing:
 
-The Windows x64 installer is project-scoped. It does not scan for projects or install globally. The user selects a specific `project.godot`, and the installer only writes to:
-
-```text
-<selected-project>/addons/godot_mcp_chatgpt/
-<selected-project>/project.godot
-```
-
-It validates the project before installation, extracts an embedded addon payload through traversal checks, stages the replacement inside the selected project, backs up an existing `godot_mcp_chatgpt` addon during upgrade, restores it if activation fails, preserves unrelated editor-plugin entries, and removes installer staging/backup files after success.
-
-The installer does not require administrator privileges and contains no hard-coded user/project path. The current Release executable is not code-signed; users who need provenance verification should compare it with the published `SHA256SUMS.txt`.
-## No arbitrary shell MCP tool
-
-Version 0.4.0 does not expose a generic arbitrary shell/PowerShell/cmd executable tool through MCP. Adding one would materially change the trust boundary and requires explicit security review.
-
-## Recommended user practices
-
-1. Use Git or another version-control system.
-2. Commit/checkpoint important work before large AI-driven edits.
-3. Use a dedicated restricted Runtime API Key.
-4. Never paste active credentials into chats, screenshots, issues, logs, or test fixtures.
-5. Test unfamiliar destructive workflows in disposable scenes first.
-6. Review large edits before committing them.
-7. Use **Forget Saved Credentials** before rotating/removing access if you no longer want automatic reconnect.
-8. Treat anyone with access to the authorized ChatGPT workspace/tunnel as able to exercise the MCP permissions you exposed.
-
-## Validation
-
-0.4.0 security/reliability validation includes:
-
-```text
-BOM_CHECK=PASS
-SECRET_CHECK=PASS
-CATALOGUE_SCHEMA_GATE=PASS tools=119
-PRODUCTION_PLUGIN_SMOKE=PASS
-CREDENTIAL_RESTART_SMOKE=PASS
-RUNTIME_AUTOLOAD_LIFECYCLE_SMOKE=PASS
-REAL_CHATGPT_GODOT_MCP_0_4_TEST=PASS
-```
-
-The real Connector test exercised traversal rejection, project-external path rejection, scene-root delete denial, invalid class/property/method errors, bounded Diagnostics, and Batch recursion denial.
-
-## Supported trust boundary
-
-The project assumes:
-
-- the local Windows account running Godot is trusted;
-- the official OpenAI tunnel runtime is trusted as a bundled third-party component;
-- the selected OpenAI/ChatGPT workspace and tunnel are intentionally authorized to access this Godot instance;
-- Godot itself and project scripts/plugins run with the permissions of the local Godot process.
-
-The addon does not attempt to sandbox Godot from its own plugins or from a compromised local account.
-
-## Reporting a security issue
-
-Do not publish secrets or an active exploit containing user credentials in a public issue.
-
-A useful security report should include:
-
-- affected plugin version/commit;
-- OS and Godot version;
-- clear impact;
-- minimal reproduction steps;
-- whether the issue crosses `res://`, loopback networking, Credential Manager handling, Runtime Debugger, Diagnostics, Batch, or destructive-operation boundaries;
-- non-secret logs only.
-
-If no private reporting channel is configured, open a public issue containing only non-sensitive metadata and ask for a private contact path.
-
-## Third-party runtime
-
-The bundled official OpenAI `tunnel-client` retains its upstream Apache-2.0 license and NOTICE. Runtime identity and SHA-256 are documented in the README and `addons/godot_mcp_chatgpt/bin/RUNTIME_INFO.txt`.
-
-## Changes requiring extra security review
-
-Treat these as security-sensitive:
-
-- arbitrary shell/process execution beyond the bounded Godot diagnostics runner;
-- access outside `res://`;
-- non-loopback MCP listeners;
-- changing Runtime API Key storage away from Windows Credential Manager without an equivalent protected store;
-- exposing the local MCP endpoint directly to the Internet;
-- weakening overwrite/delete/path safeguards;
-- accepting unauthenticated remote transports outside the official tunnel path.
+- bind address or transport;
+- browser-origin filtering;
+- path validation outside `res://`;
+- arbitrary process execution;
+- runtime debugger bridge;
+- screenshot scope;
+- custom-tool trust boundary;
+- destructive tool annotations/validation.

@@ -10,16 +10,16 @@ config_version=5
 
 [application]
 
-config/name="Godot MCP ChatGPT Dev"
+config/name="Godot MCP Local Dev"
 config/features=PackedStringArray("4.7")
 
 [autoload]
 
-GodotMCPChatGPTRuntime="*res://addons/godot_mcp_chatgpt/runtime/runtime_bridge.gd"
+GodotMCPLocalRuntime="*res://addons/godot_mcp_local/runtime/runtime_bridge.gd"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/godot_mcp_chatgpt/plugin.cfg")
+enabled=PackedStringArray("res://addons/godot_mcp_local/plugin.cfg")
 
 [rendering]
 

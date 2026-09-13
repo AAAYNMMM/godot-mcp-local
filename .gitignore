@@ -5,11 +5,6 @@
 .mcp-real-test/
 .local-test/
 
+dist/
 .godot-mcp-stdout.log
 .godot-mcp-stderr.log
-
-server/node_modules/
-server/dist/
-dist/
-tools/installer/payload.zip
-tools/installer/.build/

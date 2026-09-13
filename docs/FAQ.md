@@ -1,139 +1,89 @@
-# FAQ and Troubleshooting
+# FAQ
 
-[English] | [简体中文](FAQ.zh-CN.md)
+English | [简体中文](FAQ.zh-CN.md)
 
-## Do I need CWapi?
+## Does this need OpenAI Secure MCP Tunnel?
 
-No. `godot-mcp-chatgpt` is self-contained for its runtime path: it bundles the official OpenAI `tunnel-client` and hosts its own local Godot MCP server.
+No. This repository is the local-only variant. Godot hosts the Streamable HTTP MCP endpoint directly on `127.0.0.1`.
 
-## Do I need Codex, Cursor or Claude Desktop?
+## Does it need an API key, OpenAI account login, or OAuth?
 
-No. The point of this project is to let **Web ChatGPT** reach the Godot editor through Secure MCP Tunnel.
+No. The addon has no remote transport and no credential store. Access is limited by loopback binding and the local-machine trust boundary.
 
-## Do I need Node.js?
-
-Not for normal runtime use. `server/` contains a development-only test harness and is ignored by Godot.
-
-## Why does the addon bundle an executable?
-
-The executable is the official OpenAI `tunnel-client`. Earlier development builds attempted to implement the tunnel wire protocol directly in GDScript. That path could connect to the tunnel but failed real ChatGPT connector creation. The production design now delegates tunnel compatibility to the official runtime and keeps the Godot side focused on MCP + editor tools.
-
-## What does `Status: connected` mean?
-
-In 0.5.0 it means:
-
-- the local Godot MCP server started;
-- the official `tunnel-client` child process started and remains alive.
-
-It does **not** by itself prove that ChatGPT has already discovered tools. Tool discovery from ChatGPT is the final confirmation.
-
-## The ChatGPT connector fails to create
-
-Check:
-
-1. Godot is still open.
-2. The addon is enabled.
-3. The panel shows `Status: connected`.
-4. ChatGPT uses exactly the same Tunnel ID.
-5. The Runtime API Key has the required tunnel permissions.
-6. You are creating a Tunnel connection, not entering the local `127.0.0.1` URL manually.
-
-0.5.0 has been verified through the real Web ChatGPT Connector with 47 default public tools backed by 230 atomic commands, including actual screenshot image return.
-
-## Godot says connected but ChatGPT shows no tools
-
-Try:
-
-1. keep Godot open;
-2. disconnect/reconnect the Godot panel;
-3. refresh or recreate the ChatGPT connector using the same Tunnel ID;
-4. verify that only one intended Godot instance is using that tunnel;
-5. check the last non-secret message in the MCP ChatGPT panel.
-
-Do not send Runtime API Keys in bug reports.
-
-## I restarted Godot and the API key field is empty
-
-The field stays visually empty because the key is not echoed back into the UI. On Windows 0.5.0, a successfully connected Runtime API Key is stored in Windows Credential Manager and the addon automatically reconnects after restart when the saved Tunnel ID is also present.
-
-## Where is the API key stored?
-
-Tunnel ID is stored in Godot `EditorSettings`. On Windows 0.5.0 the Runtime API Key is stored as a Generic Credential in Windows Credential Manager. It is not written into the project, Git, EditorSettings, or generated tunnel profile. Use **Forget Saved Credentials** to remove both saved values.
-
-## Does the local MCP server listen on my LAN?
-
-No. It binds to `127.0.0.1` only, on a random high port with a random per-run path.
-
-## Can ChatGPT run arbitrary shell commands on my computer?
-
-Not through the current Godot tool surface. There is no generic shell MCP tool.
-
-## Can it edit files outside the Godot project?
-
-Current file tools are restricted to `res://` and reject `..` traversal.
-
-## Why did `scene.create` refuse to create a scene that already exists?
-
-This is a safety feature. Existing scenes are not overwritten unless `overwrite: true` is explicitly provided.
-
-## Why can ChatGPT not inspect a property I need?
-
-0.5.0 keeps these capabilities through direct and `*.manage` routes, including Node/Scene inspection, Resource inspection, and ClassDB introspection. If a specific property still cannot be represented, include the exact class/property in a bug report.
-
-## Why can ChatGPT not open an existing scene?
-
-`scene.open` and `scene.get_current` are direct in 0.5.0; close/reload/list-open remain available through `scene.manage`.
-
-## Which Godot versions are supported?
-
-The current verified target is Godot 4.7.2 Standard x64 on Windows. Other Godot 4.x versions may work, but should be treated as unverified until tested.
-
-If you test another version, a useful issue includes:
+## What is the default MCP URL?
 
 ```text
-Godot version:
-OS:
-Plugin version:
-Connector created successfully: yes/no
-Tools discovered: count
-First failing tool/error:
+http://127.0.0.1:39050/mcp
 ```
 
-## Does the renderer matter?
+The port can be changed in the **MCP Local** bottom panel.
 
-Not to the MCP transport. The project was developed with low-overhead/Compatibility-friendly Godot workflows in mind, but the connector itself is editor/tooling infrastructure.
+## How do I connect Codex?
 
-## Can multiple ChatGPT conversations use the same tunnel?
+```powershell
+codex mcp add godot --url http://127.0.0.1:39050/mcp
+```
 
-The tunnel/runtime may accept multiple remote calls, but Godot editor mutation is stateful. Treat one active editing workflow per Godot instance as the safest default until multi-session behavior is deliberately tested and documented.
+Then use `codex mcp list` to confirm the registration.
 
-## Why not expose hundreds of Godot tools immediately?
+## Does the plugin launch Codex?
 
-That is exactly why v0.5 compresses the public surface: 47 default public tools expose 230 internal atomic commands through direct tools and bounded `*.manage` routers, reducing schema overhead without dropping capability.
+No. It only exposes the current Godot Editor as an MCP server. Codex remains a separate client/process.
 
-## How should I report a bug?
+## Does the plugin need Node.js or Python?
 
-Please include:
+No for normal use. The MCP server itself is GDScript inside the Godot Editor. The Windows diagnostics helper is a small bundled executable built from Go source in `tools/run-helper/`.
 
-- Godot version;
-- OS;
-- plugin commit/version;
-- whether the panel reached `connected`;
-- whether connector creation succeeded;
-- exact non-secret error text;
-- smallest steps to reproduce;
-- whether the problem is read-only, scene/node/script mutation, or editor run/stop.
+## Why use a fixed port instead of a random port?
 
-Never include API keys, shard tokens or credentials.
+A stable local URL makes Codex configuration persistent and simple. The server still binds only to loopback. If the port conflicts with another process, choose another port in the panel.
 
-## I have a tool idea. What makes a good proposal?
+## Why is the path `/mcp` fixed?
 
-Describe the workflow, not only the method name. Good example:
+The original tunnel-oriented build used a random path because a child tunnel runtime consumed the endpoint. A local MCP client benefits more from a stable URL, so the local edition uses `/mcp`.
 
-> I need to inspect a node's editable properties before changing them, because currently ChatGPT must guess property names.
+## Is there authentication?
 
-That is more actionable than:
+No. The server cannot bind to LAN/public interfaces through the normal plugin flow; it listens only on `127.0.0.1`. Do not expose it with a reverse proxy, port forward, or public tunnel.
 
-> Add 100 more node tools.
+## Can a website call the local MCP server from my browser?
 
-See [CONTRIBUTING.md](../CONTRIBUTING.md).
+The server rejects requests carrying browser-origin headers such as `Origin` or `Sec-Fetch-Site`. This is defense-in-depth for the localhost design; it is not a replacement for authentication if remote access is ever added.
+
+## How many tools are exposed?
+
+The current default public catalogue contains 47 tools. The exact `tools/list` response is authoritative because enabled custom tools can alter the live catalogue.
+
+## Can Codex edit scripts directly instead of using MCP?
+
+Yes. A good workflow is to let Codex use normal repository/file editing when that is simplest, then use Godot MCP for editor/runtime truth, screenshots, scene-tree manipulation, diagnostics, and verification.
+
+## Do runtime changes persist to disk?
+
+Not automatically. Runtime tools operate on the live running SceneTree. Persisting a change to a scene/resource requires a corresponding editor/project save operation.
+
+## Why is `diagnostics.run_capture` Windows-only?
+
+The current bundled helper is packaged for Windows. Other editor and MCP tools are not inherently tied to that helper. A cross-platform replacement can be added later without changing the local transport architecture.
+
+## Can multiple local clients connect?
+
+The HTTP server can accept local connections, but editor mutations are serialized. For predictable development, avoid having multiple agents concurrently mutate the same Godot project.
+
+## The server says the port is in use. What do I do?
+
+Choose another port in the **MCP Local** panel and restart the server. Then update Codex with the new URL.
+
+## The plugin loads but Codex sees no tools.
+
+Verify:
+
+1. the panel shows `Status: listening`;
+2. the Codex MCP URL exactly matches the panel;
+3. Godot is still running;
+4. `codex mcp list` shows the server enabled;
+5. the local firewall/security product is not interfering with loopback traffic.
+
+## Is the old `godot-mcp-chatgpt` addon compatible side-by-side?
+
+Do not enable both variants in the same project unless you have a specific testing reason. They share much of the command/runtime design and can compete over debugger/autoload responsibilities. For Codex local use, install only `addons/godot_mcp_local/`.

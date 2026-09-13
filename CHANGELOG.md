@@ -4,6 +4,36 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 This changelog records released user-facing milestones and compatibility-impacting changes.
 
+## 0.1.0 — Local-only Codex MCP conversion
+
+Date: 2026-09-13
+
+### Highlights
+
+- Forked the proven Godot command/tool surface into the new `godot-mcp-local` repository.
+- Replaced the Secure MCP Tunnel transport with a direct loopback Streamable HTTP MCP server.
+- Default endpoint is `http://127.0.0.1:39050/mcp`; the port is configurable from the Godot **MCP Local** panel.
+- Added one-click Codex configuration text: `codex mcp add godot --url <endpoint>`.
+- Removed Tunnel ID, Runtime API Key, Windows credential storage, public control-plane harness, tunnel runtime, and tunnel installer dependencies.
+- Renamed the addon to `addons/godot_mcp_local/` and runtime autoload to `GodotMCPLocalRuntime`.
+- Kept the compact 47-default-public-tool Godot capability surface and rebuilt the local Windows diagnostics runner from source.
+- Added browser-origin request rejection as defense-in-depth for the fixed localhost endpoint.
+
+### Validation
+
+```text
+PLUGIN_LOAD=PASS
+LOCAL_LISTEN_127_0_0_1_39050=PASS
+MCP_INITIALIZE=PASS
+TOOLS_LIST=PASS tools=47
+GODOT_GET_STATUS=PASS
+JSON_RESPONSE=PASS
+SSE_RESPONSE=PASS
+BROWSER_ORIGIN_REJECT=PASS status=403
+GDSCRIPT_LOAD=PASS scripts=29 failures=0
+```
+
+The older entries below describe the history inherited from `godot-mcp-chatgpt`; tunnel-specific behavior in those entries is historical and is not part of `godot-mcp-local` 0.1.0.
 ## 0.5.0 — Capability migration and compact MCP surface
 
 Date: 2026-09-10
@@ -143,7 +173,7 @@ ChatGPT
 
 ## 0.2.2 — Editor panel usability
 
-- Moved the connection UI to a visible Godot bottom panel named **MCP ChatGPT**.
+- Moved the connection UI to a visible Godot bottom panel named **MCP Local**.
 - Improved the first-run user flow.
 
 ## 0.2.1 — Credential persistence hardening

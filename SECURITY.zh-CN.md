@@ -1,192 +1,113 @@
-# 安全说明
+# 安全策略
 
 [English](SECURITY.md) | 简体中文
 
-`godot-mcp-chatgpt` 会让经过授权的远程 ChatGPT Connector 读取和修改真实 Godot 项目。因此 0.4.0 把文件系统范围、凭据保存、Runtime 控制、进程执行和破坏性操作都作为明确安全边界。
+`godot-mcp-local` 会让本地 MCP Client 获得对真实 Godot 项目的较强控制能力，因此应把 MCP Endpoint 当作高权限本地开发接口。
 
-## 0.4.0 运行链路
+## 信任模型
 
-```text
-ChatGPT
- -> OpenAI Secure MCP Tunnel
- -> 官方 OpenAI tunnel-client
- -> 随机 127.0.0.1 Streamable HTTP MCP endpoint
- -> Godot CommandRegistry
- -> Godot Editor API
-      或
- -> EditorDebuggerPlugin -> EngineDebugger -> 运行中的游戏
-```
-
-插件本身不重写 OpenAI Tunnel wire protocol。
-
-## 本地 MCP 暴露范围
-
-Godot 内置 MCP Server：
-
-- 只监听 `127.0.0.1`；
-- 每次启动随机高位端口；
-- 每次启动随机 URL path；
-- 只作为插件内置官方 tunnel-client 的本地后端；
-- 不主动监听局域网或公网接口。
-
-## Runtime API Key 保存
-
-Windows 0.4.0：
-
-- Tunnel ID 保存在 Godot `EditorSettings`；
-- Runtime API Key 作为 **Windows Generic Credential** 保存到 Windows Credential Manager；
-- 插件独立 Credential target：`godot-mcp-chatgpt/0.4/OpenAI/Tunnel/APIKey`；
-- 明文 Key 不进入 `project.godot`、Git 或生成的 tunnel YAML profile；
-- profile 只引用 `env:CONTROL_PLANE_API_KEY`；
-- Godot 启动官方 `tunnel-client` 时临时设置该环境变量，子进程启动后立即从 Godot 父进程环境删除，并清空插件内存中的 Key；
-- 运行中的 `tunnel-client` 子进程会继承该环境值，这是进程启动机制本身所需；
-- **Forget Saved Credentials** 会同时删除保存的 Tunnel ID 和 Windows Credential Manager 条目。
-
-如果本机 Windows 用户账户已经被攻破，或者某个进程拥有足够权限，同用户进程环境仍可能被检查。Credential Manager 的目标是防止 Key 泄漏到项目、Git 和普通配置文件，而不是对已失陷本机账户提供沙箱。
-
-建议为这个 Tunnel 使用专门、受限、最小权限的 Runtime API Key。
-
-## 文件系统边界
-
-项目 File / Resource 工具只允许在 `res://` 内操作。
-
-0.4.0 会明确拒绝：
-
-- `res://../...` 路径穿越；
-- Windows 绝对路径或其他项目外路径；
-- Resource load/save 前发现的非法源路径或目标路径。
-
-真实 ChatGPT Connector 回归已经验证这些边界。未来如果要访问 `res://` 之外的文件，必须单独做安全评审。
-
-## Scene / Node 安全保护
-
-例如：
-
-- `scene.create` 默认不能覆盖已有 Scene，除非显式传 `overwrite: true`；
-- `node.delete` 不能删除当前编辑 Scene root；
-- 非法 Node class/property/method 返回错误，不会退化成任意操作；
-- Signal / Group / Metadata 编辑只作用于当前 Godot 项目和场景。
-
-## Runtime Debugger 边界
-
-0.4.0 使用 Godot 自己的 Debugger 通道：
+支持的正式拓扑：
 
 ```text
-EditorDebuggerPlugin
- <-> Godot remote-debug session
- <-> EngineDebugger
- <-> GodotMCPChatGPTRuntime autoload
+本地 MCP Client
+      |
+      | 仅 127.0.0.1
+      v
+Godot MCP Local
+      |
+      v
+当前 Godot Project / Editor / Runtime
 ```
 
-它不会再打开第二个公网网络监听。Runtime 修改只影响正在运行的实例，不会自动写回保存的编辑器 Scene。
+安全前提：
 
-插件被禁用时会清理保留的 runtime autoload，并兼容 Godot 4.7.2 的 `uid://` 路径正规化。
+- MCP Client 与 Godot 在同一台机器；
+- Listener 始终只绑定 Loopback；
+- 用户信任能够连接该本地端口的开发工具；
+- Command Layer 的路径、Schema 和破坏性操作检查保持启用。
 
-## Diagnostics 边界
+因为远程连接明确不在当前范围内，所以没有远程认证系统。
 
-`diagnostics.run_capture` **不是**通用 Shell / 任意进程工具。
+## 网络边界
 
-它只允许启动：
+MCP Server：
 
-- 当前 Godot executable；
-- 当前项目；
-- 可选项目内 `res://` Scene；
-- 并受到 timeout 和输出大小上限控制。
+- 只绑定 `127.0.0.1`；
+- 默认端口 `39050`、路径 `/mcp`；
+- 拒绝带 `Origin` 或 `Sec-Fetch-*` 等浏览器来源头的请求；
+- 不包含公网 Relay、Reverse Proxy、Tunnel Client、API Key、OAuth 或 Credential Store。
 
-返回 stdout、stderr、exit code、timeout、duration 和截断状态。
+**不要**改成 `0.0.0.0`、LAN/WAN 监听、端口转发、公网 Tunnel 或反向代理，除非先重新设计并实现真正的远程认证和授权。
 
-## Batch 边界
+Loopback 只适合作为本机边界，不能代替远程网络中的认证。
 
-`batch.execute`：
+## Godot / Project 边界
 
-- 有 operation 数量和 payload 上限；
-- 只能执行已经注册的 MCP tools；
-- 拒绝递归调用 `batch.*`；
-- 支持第一项错误后停止；
-- **不是事务**，不会回滚前面已经成功的操作。
+Tool Layer 继续校验 Project-relative Path 和结构化参数。Project / Resource Mutation 设计为限制在当前 Godot 项目，主要是 `res://`。
 
-## 安装器边界
+不要在没有单独安全评审的情况下，把任意 Shell 或无限制文件系统工具加入 Public MCP Surface。
 
-Windows x64 安装器是项目级安装器，不扫描项目，也不做全局安装。用户必须明确选择一个 `project.godot`，安装器只会写入：
+## Browser-to-localhost 防护
 
-```text
-<所选项目>/addons/godot_mcp_chatgpt/
-<所选项目>/project.godot
-```
+恶意网页可能攻击本地服务。因此 Server 会拒绝带浏览器来源头的请求，以降低网页直接访问固定 Localhost Endpoint 的风险。
 
-安装前会校验目标项目；内嵌 addon 解包时有路径穿越检查；升级时先在所选项目内 staging，再备份已有 `godot_mcp_chatgpt`，新版本激活失败时会恢复旧版本；不会删除其他 EditorPlugin entry；成功后会清理安装临时目录和备份。
+这只是 Defense-in-depth。若 Endpoint 未来可以远程访问，必须使用真正认证 / 授权，而不是依赖 Header 检查。
 
-安装器不需要管理员权限，也不包含写死的用户/项目路径。当前 Release EXE 未做代码签名；需要校验来源时，请使用发布页提供的 `SHA256SUMS.txt`。
+## Tool 安全
 
-## 不提供通用 Shell MCP
+Public Tool 在可用时保留 Read-only / Destructive Annotation，并在进入 Internal Command 前做 Input Schema 校验。写入操作应：
 
-0.4.0 不暴露通用任意 Shell / PowerShell / cmd / executable MCP 工具。未来如果增加，会显著扩大信任边界，必须单独做安全评审。
+- 限制在当前项目；
+- 在已有 Godot Integration 支持时保留 Undo/Redo；
+- 校验 Node / Resource Path 与类型；
+- 限制输出和 Image Capture 大小；
+- 避免任意进程执行。
 
-## 用户建议
+## Runtime Bridge
 
-1. 使用 Git 或其他版本控制。
-2. 大规模 AI 修改前先 commit / checkpoint。
-3. 使用专门的受限 Runtime API Key。
-4. 不要把真实 Key 放进聊天、截图、Issue、日志或测试夹具。
-5. 不熟悉的破坏性工作流先在临时 Scene 中测试。
-6. 大修改提交前先检查 diff。
-7. 如果不再希望自动重连，轮换/取消权限前使用 **Forget Saved Credentials**。
-8. 把能够访问已授权 ChatGPT workspace/tunnel 的主体视为拥有相应 MCP 操作权限。
+Runtime Control 通过 Godot Debugger Channel 和保留的 `GodotMCPLocalRuntime` Autoload 实现。Runtime Mutation 会立即影响正在运行的游戏；若调用项目自身不安全的方法，也可能导致崩溃。
 
-## 验证
+Runtime API 必须保持显式和有边界，不能暴露任意 Native Memory 或 Host Process API。
 
-0.4.0 已通过：
+## Diagnostics Helper
 
-```text
-BOM_CHECK=PASS
-SECRET_CHECK=PASS
-CATALOGUE_SCHEMA_GATE=PASS tools=119
-PRODUCTION_PLUGIN_SMOKE=PASS
-CREDENTIAL_RESTART_SMOKE=PASS
-RUNTIME_AUTOLOAD_LIFECYCLE_SMOKE=PASS
-REAL_CHATGPT_GODOT_MCP_0_4_TEST=PASS
-```
+Bundled Windows Diagnostics Runner 只能以有边界方式启动当前 Godot，并捕获 stdout/stderr：
 
-真实 Connector 测试实际覆盖了路径穿越拒绝、项目外路径拒绝、Scene root 删除拒绝、非法 class/property/method、Diagnostics 边界和 Batch 递归拒绝。
+- Godot Executable 从当前运行的 Godot 安装解析；
+- Scene Path 必须在 `res://`；
+- Timeout 与 Output Size 有上限；
+- User Args 有数量 / 长度限制；
+- 它不是通用 Shell Tool。
 
-## 信任边界
+源码位于 `tools/run-helper/`。
 
-项目假设：
+## Screenshot 与数据
 
-- 运行 Godot 的本机 Windows 账户可信；
-- 插件内置的官方 OpenAI tunnel runtime 作为第三方组件可信；
-- 选择的 OpenAI/ChatGPT workspace 与 tunnel 是有意授权访问当前 Godot 实例的；
-- Godot 自身、项目脚本和插件都拥有 Godot 本地进程权限。
+Screenshot Tool 返回选定 Godot Editor / Game Image Content，不提供任意 Desktop Capture。Logs 和 Project Inspection 仍可能包含项目敏感信息，因此只连接你信任的本地 Client。
 
-插件不会尝试把 Godot 从它自己的插件或已经失陷的本机账户中沙箱隔离。
+## Custom Tool
 
-## 报告安全问题
+第三方 Custom Tool 在 Godot Editor 进程内执行。启用它就等于扩大 MCP 实际能力边界，因此启用前应先审查对应 Addon 代码。
 
-不要在公开 Issue 中发布真实凭据或包含用户凭据的可用 exploit。
+## 安全问题报告
 
-有效安全报告应包含：
+不要在公开 Issue 中提交完整 Exploit、私有项目内容或敏感数据。请尽量给最小复现，并说明：
 
-- 受影响插件版本/commit；
-- OS 与 Godot 版本；
-- 明确影响；
-- 最小复现步骤；
-- 是否越过 `res://`、loopback、Credential Manager、Runtime Debugger、Diagnostics、Batch 或破坏性操作边界；
-- 只提供不含秘密的日志。
+- 受影响版本 / Commit；
+- Godot 版本与 OS；
+- 是否突破 Loopback / Project 边界；
+- 涉及的 Tool / Endpoint；
+- 期望行为与实际行为。
 
-如果暂时没有私密报告渠道，可以只发不敏感元数据的公开 Issue，请求私密联系方式，不要公开凭据或可直接利用细节。
+## 需要额外评审的修改
 
-## 第三方 Runtime
+以下修改必须单独做安全评审和回归：
 
-插件内置官方 OpenAI `tunnel-client`，保留上游 Apache-2.0 LICENSE 和 NOTICE。Runtime 版本及 SHA-256 见 README 和 `addons/godot_mcp_chatgpt/bin/RUNTIME_INFO.txt`。
-
-## 需要额外安全评审的变化
-
-以下变化都应视为安全敏感：
-
-- 超出当前有边界 Godot diagnostics runner 的任意 Shell/进程执行；
-- 访问 `res://` 之外文件；
-- 非 loopback MCP 监听；
-- 把 Runtime API Key 从 Windows Credential Manager 改到保护程度更低的存储；
-- 直接向公网暴露本地 MCP endpoint；
-- 弱化覆盖/删除/路径保护；
-- 官方 Tunnel 之外的未认证远程 transport。
+- Bind Address / Transport；
+- Browser Origin Filtering；
+- `res://` 之外的 Path Access；
+- 任意进程执行；
+- Runtime Debugger Bridge；
+- Screenshot Scope；
+- Custom Tool Trust Boundary；
+- Destructive Tool Annotation / Validation。

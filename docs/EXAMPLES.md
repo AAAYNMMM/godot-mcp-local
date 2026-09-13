@@ -2,7 +2,7 @@
 
 English | [简体中文](EXAMPLES.zh-CN.md)
 
-These examples are written as **normal user requests**, not raw MCP calls. ChatGPT can choose the appropriate tools from the current tool surface.
+These examples are written as **normal user requests**, not raw MCP calls. Codex or another local MCP client can choose the appropriate tools from the current tool surface.
 
 ## 1. Check what is open
 
@@ -54,7 +54,7 @@ Then update only that file so it has an exported float move_speed = 5.0.
 Preserve unrelated code and do not create or modify other files.
 ```
 
-Current limitation: `script.write` writes full file content, so asking ChatGPT to read first is important when preserving existing code.
+Current limitation: `script.write` writes full file content, so asking Codex to read first is important when preserving existing code.
 
 ## 6. Add a node to the current scene
 
@@ -95,7 +95,7 @@ Rewrite my whole project architecture.
 
 The current tool set is best at **small, visible, verifiable editor changes**.
 
-## 9. Give ChatGPT explicit safety constraints
+## 9. Give Codex explicit safety constraints
 
 Useful phrases:
 

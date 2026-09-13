@@ -133,7 +133,7 @@ editor.take_screenshot
 
 ### World Authoring
 
-使用 `world.manage`，从实时 Schema 选择 TileMap/TileSet、GridMap 或 CSG `op`。v0.5 真实 Connector 验收已经验证 Cell/Item Mutation、有边界读取、Undo/Redo、Atlas Metadata/Image Content、MeshLibrary Listing 与 CSG Operation 修改。
+使用 `world.manage`，从实时 Schema 选择 TileMap/TileSet、GridMap 或 CSG `op`。继承自 v0.5 的能力回归已经验证 Cell/Item Mutation、有边界读取、Undo/Redo、Atlas Metadata/Image Content、MeshLibrary Listing 与 CSG Operation 修改。
 
 ### 第三方 Custom Tool
 
@@ -143,14 +143,22 @@ Custom Tool 必须由真实 Addon 注册，Handler 必须属于该 Addon，强�
 
 v0.5 回归覆盖 Path Traversal/Project External 拒绝、Resource/Path 校验、Scene Root Delete 拒绝、有边界 Diagnostics/Image/Input/Logs/Test Payload、Transaction Rollback 分类、Custom Tool Ownership/Schema/Enablement，以及不提供通用任意 Shell MCP Tool。
 
-## 真实验证
+## 本地真实验证
 
-最终真实 Web ChatGPT Connector 回归于 **2026-09-10** 使用 **Godot 4.7.2-stable (official)**，通过真实 Web ChatGPT → Secure MCP Tunnel → Godot Editor/Runtime 链路验证 Compact Surface；包含真实 Screenshot Image Content，以及 Custom Tool Enable 时 47→48、Disable 后 48→47 的动态 Public Surface。
+本地版已经通过真实 **Godot 4.7.2-stable (official)** Editor Plugin 实例和 Loopback Streamable HTTP MCP 请求验证。
 
 ```text
-CATALOGUE_SCHEMA_GATE=PASS tools=47
-COMPACT_TOOL_SURFACE_GATE=PASS public=47 atomic=230
-REAL_CHATGPT_GODOT_MCP_0_5_TEST=PASS
+PLUGIN_LOAD=PASS
+LOCAL_LISTEN_127_0_0_1_39050=PASS
+MCP_INITIALIZE=PASS
+TOOLS_LIST=PASS tools=47
+GODOT_GET_STATUS=PASS
+JSON_RESPONSE=PASS
+SSE_RESPONSE=PASS
+BROWSER_ORIGIN_REJECT=PASS status=403
+GDSCRIPT_LOAD=PASS scripts=29 failures=0
 ```
+
+历史 v0.5 能力迁移已经形成 47 Public Tools / 230 Atomic Commands 的紧凑 Surface；本次 Local Conversion 改的是 Transport 和 Packaging，不改变预期 Godot 能力面。
 
 更多见：[常用示例](EXAMPLES.zh-CN.md)、[快速上手](QUICKSTART.zh-CN.md)、[安全说明](../SECURITY.zh-CN.md)。

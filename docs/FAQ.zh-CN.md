@@ -1,141 +1,89 @@
-# FAQ 与排错
+# FAQ
 
 [English](FAQ.md) | 简体中文
 
-## 需要 CWapi 吗？
+## 还需要 OpenAI Secure MCP Tunnel 吗？
 
-不需要。`godot-mcp-chatgpt` 的运行链路是自包含的：插件内置官方 OpenAI `tunnel-client`，并自己提供 Godot 本地 MCP Server。
+不需要。这个仓库就是纯本地版本，由 Godot 直接在 `127.0.0.1` 提供 Streamable HTTP MCP。
 
-## 需要 Codex、Cursor 或 Claude Desktop 吗？
+## 需要 API Key、OpenAI 登录或 OAuth 吗？
 
-不需要。这个项目的目标就是让 **Web ChatGPT** 通过 Secure MCP Tunnel 直接访问 Godot 编辑器。
+不需要。插件没有远程 Transport，也没有 Credential Store。安全边界就是本机 Loopback。
 
-## 需要 Node.js 吗？
-
-普通用户运行时不需要。仓库里的 `server/` 只是开发测试桩，Godot 会忽略它。
-
-## 为什么插件里要带一个 exe？
-
-这个 exe 是官方 OpenAI `tunnel-client`。早期开发版本尝试用 GDScript 自己实现 Tunnel wire protocol，虽然能连接 Tunnel，但真实 ChatGPT 连接器创建失败。0.3.0 改为把 Tunnel 兼容性交给官方运行时，Godot 插件只负责 MCP 和编辑器工具。
-
-## `Status: connected` 到底表示什么？
-
-0.5.0 中表示：
-
-- Godot 本地 MCP Server 已启动；
-- 官方 `tunnel-client` 子进程已经启动并保持运行。
-
-它**不等于**“ChatGPT 已经发现工具”。最终应以 ChatGPT 能否发现并调用工具为准。
-
-## ChatGPT 创建连接器失败
-
-按这个顺序检查：
-
-1. Godot 是否还开着；
-2. 插件是否启用；
-3. 面板是否显示 `Status: connected`；
-4. ChatGPT 是否使用了完全相同的 Tunnel ID；
-5. Runtime API Key 是否具备所需 Tunnel 权限；
-6. 创建的是 Tunnel 连接，而不是手动填本地 `127.0.0.1` URL。
-
-0.5.0 已完成真实 Web ChatGPT Connector 全能力回归：默认 47 个 Public Tools、后端 230 个 Atomic Commands，并实际回传 Screenshot Image。
-
-## Godot 显示 connected，但 ChatGPT 看不到工具
-
-可以尝试：
-
-1. 保持 Godot 打开；
-2. 在 Godot 面板 Disconnect 后重新 Connect；
-3. 用同一个 Tunnel ID 刷新或重新创建 ChatGPT 连接器；
-4. 确认没有多个不需要的 Godot 实例抢同一个 Tunnel；
-5. 查看 MCP ChatGPT 面板最后一条不含密钥的日志。
-
-不要把 Runtime API Key 发到 Issue 或聊天里。
-
-## 重启 Godot 后 API Key 为空
-
-输入框保持为空是为了不把保存的 Key 回显到 UI。Windows 0.5.0 在首次成功连接后会把 Runtime API Key 保存到 Windows Credential Manager；如果 Tunnel ID 也已保存，重启 Godot 后会自动重连。
-
-## API Key 存在哪里？
-
-Tunnel ID 保存在 Godot `EditorSettings`。Windows 0.5.0 把 Runtime API Key 作为 Generic Credential 保存到 Windows Credential Manager，不进入项目、Git、EditorSettings 或生成的 tunnel profile。使用 **Forget Saved Credentials** 可以同时删除两项保存内容。
-
-## 本地 MCP Server 会监听局域网吗？
-
-不会。它只绑定 `127.0.0.1`，使用随机高位端口和每次启动随机路径。
-
-## ChatGPT 能通过这个插件执行任意 Shell 命令吗？
-
-当前不能。Godot MCP 工具里没有通用 Shell 工具。
-
-## 能修改 Godot 项目目录以外的文件吗？
-
-当前文件工具限制在 `res://`，并拒绝 `..` 路径穿越。
-
-## 为什么 `scene.create` 不肯覆盖已有场景？
-
-这是安全设计。只有显式传 `overwrite: true` 才允许覆盖。
-
-## 为什么 ChatGPT 看不到我需要的节点属性？
-
-0.5.0 继续通过 Direct / `*.manage` Route 提供 Node/Scene、Resource 与 ClassDB 检查能力。如果某个特定属性仍无法表达，请在 bug 报告中提供准确 class/property。
-
-## 为什么不能打开已有场景？
-
-0.5.0 中 `scene.open` / `scene.get_current` 为 Direct Tool，close/reload/list-open 继续由 `scene.manage` 提供。
-
-## 支持哪些 Godot 版本？
-
-当前明确验证的是 Windows 上的 Godot 4.7.2 Standard x64。其他 Godot 4.x 版本可能可用，但在测试前都应视为“未验证”。
-
-如果你测试了其他版本，一个高质量 Issue 最好包含：
+## 默认 MCP 地址是什么？
 
 ```text
-Godot 版本：
-操作系统：
-插件版本：
-连接器创建成功：是/否
-发现工具数量：
-第一个失败工具/报错：
+http://127.0.0.1:39050/mcp
 ```
 
-## 渲染器有影响吗？
+端口可以在底部 **MCP Local** 面板修改。
 
-对 MCP 连接方式没有影响。项目开发时偏向低开销/Compatibility 友好的 Godot 工作流，但连接器本身属于编辑器工具基础设施。
+## 怎么接 Codex？
 
-## 多个 ChatGPT 对话能共用一个 Tunnel 吗？
+```powershell
+codex mcp add godot --url http://127.0.0.1:39050/mcp
+```
 
-Tunnel/运行时可能能接收多个远程调用，但 Godot 编辑器修改是有状态的。在多会话行为被专门测试前，最稳妥的默认方式是：一个 Godot 实例对应一个主要编辑工作流。
+然后用 `codex mcp list` 确认。
 
-## 为什么不一次性暴露几百个 Godot 工具？
+## 插件会启动 Codex 吗？
 
-这正是 v0.5 压缩 Public Surface 的原因：默认 47 个 Public Tools 通过 Direct Tool 与有边界 `*.manage` Router 覆盖 230 个 Internal Atomic Commands，降低 Schema 开销而不丢能力。
+不会。插件只把当前 Godot Editor 暴露为 MCP Server，Codex 仍是独立 Client / Process。
 
-## 怎么提交一个高质量 bug？
+## 正常使用需要 Node.js 或 Python 吗？
 
-请提供：
+不需要。MCP Server 本身是运行在 Godot Editor 内的 GDScript。Windows 的 Diagnostics Helper 是一个很小的本地可执行文件，Go 源码在 `tools/run-helper/`。
 
-- Godot 版本；
-- 操作系统；
-- 插件 commit/版本；
-- Godot 面板是否到 `connected`；
-- ChatGPT 连接器是否创建成功；
-- 完整但不含密钥的报错；
-- 最小复现步骤；
-- 问题属于只读、场景/节点/脚本修改，还是运行/停止。
+## 为什么改成固定端口？
 
-不要提交 API Key、Shard Token 或其他凭据。
+固定本地 URL 可以让 Codex 配置长期有效、使用更简单。Server 仍只绑定 Loopback。如果端口冲突，在面板换一个即可。
 
-## 我有一个新工具想法，怎么提更有价值？
+## 为什么路径固定为 `/mcp`？
 
-描述“真实工作流”，不要只说方法名。例如：
+旧 Tunnel 版本使用随机路径是为了给 Tunnel 子进程消费；纯本地 Client 更适合稳定 URL，因此改为 `/mcp`。
 
-> 我需要在修改节点前读取它可编辑的属性列表，现在 ChatGPT 只能猜属性名。
+## 有认证吗？
 
-这比：
+没有。正常插件流程只能监听 `127.0.0.1`，不会监听 LAN / 公网。不要通过反向代理、端口转发或公网 Tunnel 把它暴露出去。
 
-> 再加 100 个节点工具。
+## 网页能不能从浏览器访问这个 localhost MCP？
 
-更容易设计出正确接口。
+Server 会拒绝带 `Origin`、`Sec-Fetch-Site` 等浏览器来源头的请求。这属于本地设计的额外防护；如果未来做远程访问，仍必须加入真正认证。
 
-更多见：[CONTRIBUTING.zh-CN.md](../CONTRIBUTING.zh-CN.md)。
+## 有多少工具？
+
+当前默认 Public Catalogue 为 47 个 Tool。实时 `tools/list` 才是最终权威，因为启用 Custom Tool 后 Catalogue 可以变化。
+
+## Codex 可以不用 MCP，直接改 GDScript 吗？
+
+可以，而且这是推荐工作流的一部分。文件修改简单时让 Codex 直接操作仓库；需要 Editor / Runtime 真实状态、Screenshot、SceneTree、Diagnostics 和验证时再使用 Godot MCP。
+
+## Runtime 修改会自动保存到磁盘吗？
+
+不会。Runtime Tool 默认只修改正在运行的 SceneTree。要持久化仍需额外执行 Editor / Resource 保存操作。
+
+## 为什么 `diagnostics.run_capture` 目前只支持 Windows？
+
+当前 Bundled Helper 是 Windows 版本。其他 MCP / Editor Tool 本身并不依赖这个 Helper；以后可以单独补跨平台实现而不改变本地 MCP 架构。
+
+## 可以多个本地 Client 同时连接吗？
+
+HTTP Server 可以接收本地连接，但 Editor Mutation 会串行执行。为了避免互相覆盖，不建议多个 Agent 同时修改同一个 Godot 项目。
+
+## 提示端口被占用怎么办？
+
+在 **MCP Local** 面板换一个端口并 Restart，然后把 Codex MCP URL 更新为新地址。
+
+## 插件正常，但 Codex 看不到工具
+
+依次检查：
+
+1. 面板是否为 `Status: listening`；
+2. Codex 地址是否与面板完全一致；
+3. Godot 是否还在运行；
+4. `codex mcp list` 是否显示 Server 已启用；
+5. 本机安全软件是否干扰 Loopback。
+
+## 能同时启用旧 `godot-mcp-chatgpt` 吗？
+
+除非专门做测试，否则不要。两个版本复用了大量命令和 Runtime / Debugger 设计，可能争用 Autoload 或 Debugger 状态。Codex 本地使用只安装 `addons/godot_mcp_local/`。

@@ -1,182 +1,140 @@
 # Quick Start
 
-[English] | [简体中文](QUICKSTART.zh-CN.md)
-
-This guide is written for users who want to get from a fresh Godot project to a working ChatGPT connector with the fewest moving parts.
+English | [简体中文](QUICKSTART.zh-CN.md)
 
 ## Requirements
 
-Current tested setup:
+- Godot 4.7.x (validated on 4.7.2 Standard x64 on Windows).
+- Codex CLI or another local MCP client that supports Streamable HTTP.
+- The target Godot project open in the editor.
 
-- Windows x64;
-- Godot 4.7.2 Standard x64;
-- a Godot project you can edit;
-- access to OpenAI Secure MCP Tunnel in the OpenAI/ChatGPT workspace you plan to use;
-- a Tunnel ID;
-- a restricted Runtime API Key for that tunnel.
+No OpenAI tunnel, API key, browser connector, Node server, or Python server is required.
 
-You do **not** need CWapi, Node.js, Codex, Claude Desktop, Cursor, or another local MCP client at runtime.
+## 1. Install the addon
 
-## Step 1 — Install the addon
-
-### Recommended: Windows x64 installer
-
-Download `godot-mcp-chatgpt-v0.5.0-windows-x64-installer.exe` from [GitHub Releases](https://github.com/AAAYNMMM/godot-mcp-chatgpt/releases), run it, then select the target project's `project.godot` file.
-
-The installer validates that the selected path is a Godot project, installs the embedded addon only to:
+Copy:
 
 ```text
-<selected-project>/addons/godot_mcp_chatgpt/
+addons/godot_mcp_local/
 ```
 
-and enables the editor plugin by default. Re-running the installer upgrades that project's existing copy. No project or user path is hard-coded into the executable.
+into the target Godot project.
 
-The current installer is unsigned. Windows SmartScreen may therefore show an unknown-publisher warning. The Release includes `SHA256SUMS.txt` for verification.
-
-If the project is already open in Godot, restart/reopen it after installation so the new plugin files load cleanly.
-
-### Manual alternative
-
-Extract the addon ZIP so this exists:
-
-```text
-<your-project>/addons/godot_mcp_chatgpt/plugin.cfg
-```
-
-Then open:
+Enable **Godot MCP Local** under:
 
 ```text
 Project -> Project Settings -> Plugins
 ```
 
-Enable **Godot MCP ChatGPT**.
+## 2. Check the local endpoint
 
-Expected result: a bottom panel named **MCP ChatGPT** appears.
-
-## Step 2 — Prepare the OpenAI tunnel
-
-Create or select a Secure MCP Tunnel in your OpenAI workspace.
-
-Keep the Tunnel ID. It should look like a tunnel identifier, for example:
+Open the bottom **MCP Local** panel. The default endpoint is:
 
 ```text
-tunnel_...
+http://127.0.0.1:39050/mcp
 ```
 
-Create a dedicated restricted Runtime API Key for tunnel use. Do not reuse an admin key just because it is convenient.
+The addon starts the server automatically. If port `39050` is already in use, choose another port in the panel and press **Restart on Port**.
 
-Never commit the Runtime API Key or paste it into a public issue.
+## 3. Add it to Codex
 
-## Step 3 — Connect from Godot
+Run:
 
-Open the bottom **MCP ChatGPT** panel and enter:
+```powershell
+codex mcp add godot --url http://127.0.0.1:39050/mcp
+```
+
+Or press **Copy Codex Command** in the Godot panel and paste the generated command into a terminal.
+
+Verify:
+
+```powershell
+codex mcp list
+```
+
+## 4. First safe test
+
+Ask Codex:
 
 ```text
-Tunnel ID
-Runtime API Key
+Use the Godot MCP tools to inspect the current project. Report the project name, Godot version, current scene, and top-level scene tree. Do not modify anything.
 ```
 
-Press **Connect**.
+The server should expose the current tool catalogue, including `godot.get_status`, scene/project tools, runtime tools, screenshots, logs, tests, batch/transaction, and authoring helpers.
 
-Expected state:
+## 5. Normal development workflow
+
+A practical loop is:
 
 ```text
-Status: connected
+Codex edits project files when direct file editing is simplest
+        +
+Godot MCP manipulates/inspects editor and runtime state
+        +
+Godot CLI or diagnostics.run_capture validates code
+        +
+Git saves known-good baselines
 ```
 
-In version 0.5.0 this means the bundled official OpenAI `tunnel-client` process is alive and the local Godot MCP endpoint is available to it. After the first successful connection, the Runtime API Key is stored in Windows Credential Manager for automatic reconnect.
+Use the MCP for operations where editor/runtime truth matters: scene tree, Inspector state, screenshots, live runtime, input injection, animation/resources, Undo/Redo, and test/diagnostic evidence.
 
-If the state does not become connected, jump to [FAQ](FAQ.md).
+## Port changes
 
-## Step 4 — Create the ChatGPT connector
-
-In ChatGPT connector settings:
-
-1. create a new connector;
-2. select **Connection: Tunnel**;
-3. choose or paste the same Tunnel ID;
-4. create/save the connector while Godot remains open.
-
-The 0.5.0 path passed the final real Web ChatGPT Connector regression with 47 default public tools / 230 internal atomic commands, including actual screenshot image return.
-
-## Step 5 — Test read access first
-
-Ask ChatGPT to use the connector and call:
+The selected port is stored in Godot `EditorSettings` under:
 
 ```text
-godot.get_status
+godot_mcp_local/port
 ```
 
-A healthy result should include a Godot version beginning with `4.7.2` in the currently tested environment, plus editor/project information.
+Changing the port changes the MCP URL. Update the Codex registration by removing/re-adding it if necessary:
 
-Then try:
+```powershell
+codex mcp remove godot
+codex mcp add godot --url http://127.0.0.1:<new-port>/mcp
+```
+
+## Troubleshooting
+
+### Codex cannot connect
+
+Check, in order:
+
+1. Godot Editor is still running.
+2. **Godot MCP Local** is enabled.
+3. The panel says `Status: listening`.
+4. Codex uses the exact endpoint shown in the panel.
+5. No other process owns the selected port.
+
+On Windows you can check the default port with:
+
+```powershell
+Get-NetTCPConnection -LocalPort 39050 -State Listen
+```
+
+### The plugin fails to load
+
+Check the Godot Output panel and confirm the addon exists at:
 
 ```text
-project.get_info
+res://addons/godot_mcp_local/plugin.cfg
 ```
 
-If these work, remote MCP discovery and read calls are healthy.
+Do not install it under the old `addons/godot_mcp_chatgpt/` path.
 
-## Step 6 — Test a disposable write
+### Runtime tools are unavailable
 
-Do not use an important production scene for the first write test.
+Runtime inspection requires a debuggable running project and Godot's debugger session. Editor-time tools can still work when no game is running.
 
-Suggested safe sequence:
+### `diagnostics.run_capture` says the runner is missing
+
+The Windows package/source checkout must include:
 
 ```text
-scene.create
-  path: res://mcp_test/main.tscn
-  root_type: Node3D
-  root_name: MCPTest
-
-node.create
-  parent_path: .
-  type: Node3D
-  name: RemoteNode
-
-node.set_property
-  node_path: RemoteNode
-  property: position
-  value: {"__godot_type":"Vector3","x":1,"y":2,"z":3}
-
-scene.save
+addons/godot_mcp_local/bin/windows/godot-mcp-runner.exe
 ```
 
-Verify in the visible Godot editor that:
+The helper source is under `tools/run-helper/`.
 
-- `main.tscn` exists;
-- the root is `MCPTest`;
-- `RemoteNode` exists;
-- its position is `(1, 2, 3)`.
+## Security note
 
-## Step 7 — Use it like a development tool
-
-A productive request usually describes the desired result rather than micromanaging every tool call. For example:
-
-```text
-In the current Godot project, create a simple player test scene with a Node3D root,
-a CharacterBody3D named Player, and attach a new GDScript that exposes move_speed.
-Save it under res://prototype/player_test.tscn. Do not overwrite existing files.
-```
-
-The current surface contains 47 default public tools backed by 230 internal atomic commands. If ChatGPT cannot inspect or change something, check the [Tool Reference](TOOL_REFERENCE.md) and the live tool schema before assuming the connection is broken.
-
-## Disconnecting
-
-Press **Disconnect** in the Godot panel before rotating credentials or changing tunnels.
-
-On Windows 0.5.0, the Runtime API Key is stored in Windows Credential Manager after a successful connection, so the addon can automatically reconnect after restarting Godot. Use **Forget Saved Credentials** if you want to remove the stored key and Tunnel ID.
-
-## First troubleshooting checks
-
-If something fails, check in this order:
-
-1. Is the Godot plugin enabled?
-2. Does the bottom panel show `Status: connected`?
-3. Is the ChatGPT connector using the exact same Tunnel ID?
-4. Is Godot still open?
-5. Does the Runtime API Key have the required tunnel permissions?
-6. Can ChatGPT discover `godot.get_status`?
-7. Is the requested operation available through the current v0.5 direct/managed public surface, and are you using the argument conventions in the Tool Reference?
-
-More: [FAQ / Troubleshooting](FAQ.md).
+The server is intentionally loopback-only. Do not expose it through `0.0.0.0`, LAN binding, port forwarding, a reverse proxy, or a public tunnel. The local design has no remote-authentication layer.

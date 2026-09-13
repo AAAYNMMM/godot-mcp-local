@@ -4,6 +4,36 @@
 
 本 Changelog 记录已经发布的用户可见里程碑和会影响兼容性的变化。
 
+## 0.1.0 — 纯本地 Codex MCP 转换
+
+日期：2026-09-13
+
+### 重点
+
+- 基于已经验证过的 Godot Command / Tool Surface 创建新的 `godot-mcp-local` 仓库。
+- 用直接 Loopback Streamable HTTP MCP 替换 Secure MCP Tunnel Transport。
+- 默认 Endpoint 为 `http://127.0.0.1:39050/mcp`，端口可在 Godot **MCP Local** 面板修改。
+- 面板直接给出 Codex 配置命令：`codex mcp add godot --url <endpoint>`。
+- 删除 Tunnel ID、Runtime API Key、Windows Credential Store、Public Control Plane Harness、Tunnel Runtime 和 Tunnel Installer 依赖。
+- Addon 改名为 `addons/godot_mcp_local/`，Runtime Autoload 改为 `GodotMCPLocalRuntime`。
+- 保留默认 47 Public Tools 的紧凑 Godot 能力面，并从源码重新构建本地 Windows Diagnostics Runner。
+- 为固定 Localhost Endpoint 增加 Browser-origin Request 拒绝作为额外防护。
+
+### 验证
+
+```text
+PLUGIN_LOAD=PASS
+LOCAL_LISTEN_127_0_0_1_39050=PASS
+MCP_INITIALIZE=PASS
+TOOLS_LIST=PASS tools=47
+GODOT_GET_STATUS=PASS
+JSON_RESPONSE=PASS
+SSE_RESPONSE=PASS
+BROWSER_ORIGIN_REJECT=PASS status=403
+GDSCRIPT_LOAD=PASS scripts=29 failures=0
+```
+
+下面更早的条目来自 `godot-mcp-chatgpt` 的历史；其中 Tunnel 相关行为只属于历史版本，不属于 `godot-mcp-local` 0.1.0。
 ## 0.5.0 — 能力迁移与 Compact MCP Surface
 
 日期：2026-09-10
@@ -143,7 +173,7 @@ ChatGPT
 
 ## 0.2.2 — 编辑器面板可用性
 
-- 连接 UI 移到 Godot 底部明显可见的 **MCP ChatGPT** 面板。
+- 连接 UI 移到 Godot 底部明显可见的 **MCP Local** 面板。
 - 改善第一次使用体验。
 
 ## 0.2.1 — 凭据持久化加固

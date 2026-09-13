@@ -1,183 +1,138 @@
-# 快速上手
+# 快速开始
 
 [English](QUICKSTART.md) | 简体中文
 
-这份指南面向第一次使用的用户，目标是用尽可能少的步骤，把一个普通 Godot 项目连接到 Web ChatGPT。
+## 环境要求
 
-## 需要什么
+- Godot 4.7.x（Windows 下已验证 4.7.2 Standard x64）。
+- Codex CLI，或其他支持 Streamable HTTP 的本地 MCP Client。
+- 目标 Godot 项目已在 Editor 中打开。
 
-当前已验证环境：
+不需要 OpenAI Tunnel、API Key、浏览器 Connector、Node Server 或 Python Server。
 
-- Windows x64；
-- Godot 4.7.2 Standard x64；
-- 一个可以修改的 Godot 项目；
-- 你的 OpenAI/ChatGPT 工作区能够使用 Secure MCP Tunnel；
-- 一个 Tunnel ID；
-- 一个用于该 Tunnel 的受限 Runtime API Key。
+## 1. 安装插件
 
-运行时**不需要** CWapi、Node.js、Codex、Claude Desktop、Cursor 或其他本地 MCP 客户端。
-
-## 第 1 步：安装插件
-
-### 推荐：Windows x64 一键安装器
-
-从 [GitHub Releases](https://github.com/AAAYNMMM/godot-mcp-chatgpt/releases) 下载 `godot-mcp-chatgpt-v0.5.0-windows-x64-installer.exe`，运行后选择目标项目的 `project.godot`。
-
-安装器会验证所选路径确实是 Godot 项目，并且只把内嵌插件安装到：
+把：
 
 ```text
-<所选项目>/addons/godot_mcp_chatgpt/
+addons/godot_mcp_local/
 ```
 
-默认自动启用 EditorPlugin；再次运行安装器会升级这个项目已有的插件副本。安装器里没有写死任何用户路径或项目路径。
-
-当前安装器未做代码签名，所以 Windows SmartScreen 可能提示“未知发布者”。Release 同时提供 `SHA256SUMS.txt`，可用于校验文件。
-
-如果目标项目已经在 Godot 中打开，安装后请重启/重新打开项目，让新插件文件完整加载。
-
-### 手动备选方式
-
-解压 addon ZIP，最终确认存在：
-
-```text
-<你的项目>/addons/godot_mcp_chatgpt/plugin.cfg
-```
-
-然后在 Godot 中打开：
+复制到目标 Godot 项目，然后在：
 
 ```text
 项目 -> 项目设置 -> 插件
 ```
 
-启用 **Godot MCP ChatGPT**。
+启用 **Godot MCP Local**。
 
-预期结果：Godot 底部出现 **MCP ChatGPT** 面板。
+## 2. 查看本地 Endpoint
 
-## 第 2 步：准备 OpenAI Tunnel
-
-在你的 OpenAI 工作区创建或选择一个 Secure MCP Tunnel。
-
-记住 Tunnel ID，例如：
+打开底部 **MCP Local** 面板。默认地址：
 
 ```text
-tunnel_...
+http://127.0.0.1:39050/mcp
 ```
 
-再创建一个专门用于 Tunnel 的受限 Runtime API Key。不要为了省事长期使用 Admin Key。
+插件启用后自动监听。如果 `39050` 已被占用，在面板修改端口后点击 **Restart on Port**。
 
-不要把 Runtime API Key 提交进 Git，也不要贴到公开 Issue。
+## 3. 添加到 Codex
 
-## 第 3 步：在 Godot 中连接
+执行：
 
-打开底部 **MCP ChatGPT** 面板，填入：
+```powershell
+codex mcp add godot --url http://127.0.0.1:39050/mcp
+```
+
+也可以直接点击 Godot 面板里的 **Copy Codex Command**，再粘贴到终端。
+
+确认：
+
+```powershell
+codex mcp list
+```
+
+## 4. 第一条安全测试
+
+对 Codex 说：
 
 ```text
-Tunnel ID
-Runtime API Key
+使用 Godot MCP 工具检查当前项目，告诉我项目名、Godot 版本、当前场景和顶层场景树，不要修改任何内容。
 ```
 
-点击 **Connect**。
+正常情况下会发现完整 Tool Catalogue，包括 `godot.get_status`、Project/Scene、Runtime、Screenshot、Logs、Tests、Batch/Transaction 和 Authoring Tools。
 
-预期状态：
+## 5. 推荐开发闭环
 
 ```text
-Status: connected
+Codex 适合直接修改文件时直接改项目文件
+        +
+Godot MCP 负责 Editor / Runtime 真实状态
+        +
+Godot CLI 或 diagnostics.run_capture 做验证
+        +
+Git 保存已通过基线
 ```
 
-在 0.3.0 中，这表示插件内置的官方 OpenAI `tunnel-client` 子进程已经正常运行，并且本地 Godot MCP endpoint 已经准备好供它访问。
+涉及 SceneTree、Inspector、Screenshot、Runtime、Input Injection、Animation/Resource、Undo/Redo、测试证据时，优先使用 MCP。
 
-如果状态没有变成 connected，请直接看 [FAQ / 排错](FAQ.zh-CN.md)。
+## 修改端口
 
-## 第 4 步：在 ChatGPT 创建连接器
-
-在 ChatGPT 的连接器设置中：
-
-1. 创建新连接器；
-2. 选择 **Connection: Tunnel**；
-3. 选择或填写和 Godot 中完全相同的 Tunnel ID；
-4. 保持 Godot 打开的情况下创建/保存连接器。
-
-0.3.0 已经完成过真实 ChatGPT 连接器创建测试，并成功通过。
-
-## 第 5 步：先测试只读能力
-
-先让 ChatGPT 调用：
+选择的端口保存在 Godot `EditorSettings`：
 
 ```text
-godot.get_status
+godot_mcp_local/port
 ```
 
-在当前测试环境中，正常结果应包含以 `4.7.2` 开头的 Godot 版本，以及编辑器/项目信息。
+端口变化后 MCP URL 也会变化。必要时重新配置 Codex：
 
-再测试：
+```powershell
+codex mcp remove godot
+codex mcp add godot --url http://127.0.0.1:<新端口>/mcp
+```
+
+## 排障
+
+### Codex 连不上
+
+按顺序检查：
+
+1. Godot Editor 是否仍在运行。
+2. **Godot MCP Local** 是否启用。
+3. 面板是否显示 `Status: listening`。
+4. Codex 使用的地址是否和面板完全一致。
+5. 端口是否被别的程序占用。
+
+Windows 下可检查默认端口：
+
+```powershell
+Get-NetTCPConnection -LocalPort 39050 -State Listen
+```
+
+### 插件无法加载
+
+查看 Godot Output，并确认文件存在：
 
 ```text
-project.get_info
+res://addons/godot_mcp_local/plugin.cfg
 ```
 
-如果这两个都能调用，说明远程 MCP 工具发现和只读调用已经正常。
+不要再安装到旧 `addons/godot_mcp_chatgpt/` 路径。
 
-## 第 6 步：测试一次性写入
+### Runtime Tool 不可用
 
-第一次写入不要拿重要场景做实验。
+Runtime Inspection 需要项目真实运行且 Debugger Session 可用。没有运行游戏时，Editor-time Tool 仍然可以正常使用。
 
-建议按这个安全流程：
+### `diagnostics.run_capture` 提示 Runner 缺失
+
+Windows 版本必须包含：
 
 ```text
-scene.create
-  path: res://mcp_test/main.tscn
-  root_type: Node3D
-  root_name: MCPTest
-
-node.create
-  parent_path: .
-  type: Node3D
-  name: RemoteNode
-
-node.set_property
-  node_path: RemoteNode
-  property: position
-  value: {"__godot_type":"Vector3","x":1,"y":2,"z":3}
-
-scene.save
+addons/godot_mcp_local/bin/windows/godot-mcp-runner.exe
 ```
 
-然后直接在 Godot 里确认：
+源码在 `tools/run-helper/`。
 
-- `main.tscn` 已创建；
-- 根节点是 `MCPTest`；
-- 存在 `RemoteNode`；
-- position 是 `(1, 2, 3)`。
+## 安全说明
 
-## 第 7 步：按真实开发方式使用
-
-实际使用时，更推荐描述“你想要的结果”，而不是手动指挥每一个 MCP 工具。例如：
-
-```text
-在当前 Godot 项目中创建一个简单的玩家测试场景：
-根节点 Node3D，添加名为 Player 的 CharacterBody3D，
-新建并挂载一个 GDScript，暴露 move_speed 变量。
-保存到 res://prototype/player_test.tscn，不要覆盖已有文件。
-```
-
-当前能力面为 47 个默认 Public Tools，后端覆盖 230 个 Internal Atomic Commands。如果 ChatGPT 暂时无法读取或修改某个东西，先查看 [工具参考](TOOL_REFERENCE.zh-CN.md)和实时 tool schema，不要直接判断为“连接坏了”。
-
-## 断开连接
-
-更换 Tunnel 或轮换凭据前，先在 Godot 面板点 **Disconnect**。
-
-Windows 0.5.0 在首次成功连接后会把 Runtime API Key 保存到 Windows Credential Manager，重启 Godot 后可自动重连。使用 **Forget Saved Credentials** 可以删除保存的 Key 和 Tunnel ID。
-
-## 最先检查的排错项
-
-如果失败，按这个顺序看：
-
-1. Godot 插件是否启用？
-2. 底部是否显示 `Status: connected`？
-3. ChatGPT 连接器是否用了完全相同的 Tunnel ID？
-4. Godot 是否仍然开着？
-5. Runtime API Key 是否具备所需 Tunnel 权限？
-6. ChatGPT 能否发现 `godot.get_status`？
-7. 你要求的操作是否可通过当前 v0.5 Direct / Managed Public Surface 访问，并且参数是否符合 Tool Reference 约定？
-
-更多见：[FAQ / 排错](FAQ.zh-CN.md)。
+Server 明确只供本机使用。不要改成 `0.0.0.0`、LAN 监听、端口转发、反向代理或公网 Tunnel；当前纯本地设计没有远程认证层。

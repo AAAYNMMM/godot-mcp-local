@@ -2,183 +2,112 @@
 
 [English](ARCHITECTURE.md) | 简体中文
 
-## 已锁定的生产架构
+## 正式拓扑
 
-从 `0.3.0` 起，生产链路固定为：
-
-```text
-ChatGPT / 支持 OpenAI MCP 的产品
-              |
-              | OpenAI Secure MCP Tunnel
-              v
-      OpenAI tunnel service
-              |
-              v
- 官方 OpenAI tunnel-client
-      （插件内置子进程）
-              |
-              | Streamable HTTP MCP
-              | 127.0.0.1:<随机端口>/<随机路径>
-              v
-   local_mcp_server.gd
-              |
-              v
-      CommandRegistry
-              |
-              v
-        Godot Editor
-```
-
-关键决定：**Godot 不自己实现 OpenAI Tunnel wire protocol。** Tunnel 兼容性由官方 OpenAI `tunnel-client` 负责。
-
-关键设计是：**Godot 不实现 OpenAI Tunnel wire protocol**。Tunnel Transport 由官方 OpenAI `tunnel-client` 负责，本插件专注本地 MCP Server 和 Godot 集成。
-
-## 为什么最终选择这个架构
-
-早期版本曾经用 GDScript 自己实现 control-plane `/poll` 和 `/response`。本地协议仿真可以通过，Godot 也能显示 connected，但真实 ChatGPT 创建连接器仍然失败。
-
-早期曾验证过自定义直连 Tunnel 实现，但真实 ChatGPT Connector 路径不满足生产要求。因此生产架构改为：
+`godot-mcp-local` 只维护一种纯本地架构：
 
 ```text
-官方 tunnel-client
- -> localhost Streamable HTTP MCP
+Codex / 本地 MCP Client
+        |
+        | Streamable HTTP MCP
+        | 127.0.0.1:<port>/mcp
+        v
+local_mcp_server.gd
+        |
+        v
+PublicToolSurface
+        |
+        v
+CommandRegistry
+        |
+        +--> Godot Editor API
+        +--> Editor Debugger Bridge
+        +--> Running Project Runtime Bridge
 ```
 
-0.3.0 因此切换到同一设计思想。
+没有公网 Relay、Tunnel 子进程、API Key、Credential Store，也没有独立 MCP Daemon。
 
-好处：
+## 本地 MCP Transport
 
-- 不运营自建公网 Relay；
-- 不复制 OpenAI Tunnel 兼容逻辑；
-- 用户仍然只需要 Tunnel ID + Runtime API Key；
-- Tunnel 行为跟随官方 runtime；
-- Godot 工具执行仍然在编辑器进程内完成；
-- loopback MCP 不对外网开放。
-
-2026-09-09 真实 ChatGPT 连接器创建成功，进一步验证了这套架构。
-
-## 官方 tunnel-client 子进程
-
-`tunnel_client_runner.gd` 负责：
-
-1. 校验 Tunnel ID 和 Runtime API Key；
-2. 启动 loopback MCP Server；
-3. 生成包含 Tunnel ID 和本地 MCP URL 的 profile；
-4. profile 只写 `api_key: env:CONTROL_PLANE_API_KEY`；
-5. 临时把 key 放入 Godot 进程环境；
-6. 执行内置 `tunnel-client.exe run --profile-file ...`；
-7. 子进程创建后立即从 Godot 父进程环境移除 key；
-8. 监控子进程，Disconnect/退出时清理本地 MCP。
-
-Profile 概念结构：
-
-```yaml
-config_version: 1
-control_plane:
-  tunnel_id: <tunnel id>
-  api_key: env:CONTROL_PLANE_API_KEY
-health:
-  listen_addr: 127.0.0.1:0
-admin_ui:
-  open_browser: false
-mcp:
-  server_urls:
-    - channel: main
-      url: http://127.0.0.1:<random>/mcp/<random>
-```
-
-## Godot 本地 Streamable HTTP MCP
-
-`local_mcp_server.gd` 使用 Godot `TCPServer` / `StreamPeerTCP` 实现一个很小的 loopback-only MCP Server。
+`addons/godot_mcp_local/transport/local_mcp_server.gd` 使用 Godot `TCPServer` / `StreamPeerTCP` 实现 Streamable HTTP MCP。
 
 特性：
 
-- 仅绑定 `127.0.0.1`；
-- 每次随机高位端口；
-- 每次随机路径 token；
-- 限制请求 body 大小；
-- 编辑器修改请求串行执行，避免 mutation race；
-- 支持 Streamable HTTP 客户端需要的 JSON/SSE 响应；
-- 支持通知 ACK 和 session termination。
+- 只绑定 `127.0.0.1`；
+- 默认端口 `39050`；
+- 固定路径 `/mcp`；
+- 可通过 Godot `EditorSettings` 和底部 **MCP Local** 面板修改端口；
+- 请求体大小上限；
+- 请求串行调度，避免 Editor 写操作竞争；
+- 支持 JSON 与 SSE Response；
+- 因为不支持非本机连接，所以不做 API Key 认证；
+- 带浏览器 Origin 类请求头的请求会被拒绝。
 
-当前处理：
+支持的 MCP 方法包括：
 
 - `server/discover`
 - `initialize`
 - `ping`
 - `tools/list`
 - `tools/call`
-- 无 ID 生命周期通知
-- HTTP `DELETE` session termination
+- 无 ID Notification
+- HTTP `DELETE` 确认
 
-## Godot 工具边界
+## Tool Surface
 
-0.5.0 默认公开 **47 个 Public Tools**，后端保留 **230 个 Internal Atomic Commands**，围绕真实 Godot 工作流组织，而不是提供通用 Shell：
+插件继续使用紧凑 Public Surface，而不是暴露数百个扁平命令。当前默认 Catalogue 为 47 个 Public Tools，后端复用现有 Internal Command Registry。
 
-```text
-Project / InputMap
-Scene / Node / Signal / Group / Metadata
-Script / Resource
-ClassDB
-Editor
-Debugger / Runtime
-Diagnostics
-Batch
-```
+覆盖 Project/Input、Scene/Node、Script/Resource、ClassDB、Editor、Diagnostics、Runtime/Debugger、Screenshot、Animation、UI/Resource Authoring、World Authoring、Batch/Transaction、Tests、Logs 与 Custom Tools。
 
-项目 File / Resource 操作仍限制在 `res://`。编辑器 mutation 通过 Godot command layer 串行处理。精确参数以实时 `tools/list` schema 为准，完整索引见：[工具参考](TOOL_REFERENCE.zh-CN.md)。
+实时 `tools/list` 返回的 Schema 是最终权威，见 [TOOL_REFERENCE.zh-CN.md](TOOL_REFERENCE.zh-CN.md)。
 
-## Runtime Debugger 路径
+## Runtime 路径
 
-Runtime 读取和控制不会再开启另一个公网网络服务，而是使用 Godot 自己的 Debugger 通道：
+Runtime Tool 不再开第二个网络端口，而是使用 Godot 自己的 Debugger Channel：
 
 ```text
-MCP runtime.* / debugger.* tool
+MCP runtime.* / debugger.*
  -> RuntimeDebuggerManager
  -> EditorDebuggerPlugin / EditorDebuggerSession
  -> Godot remote-debug channel
  -> EngineDebugger
- -> GodotMCPChatGPTRuntime autoload
- -> 运行中 SceneTree
+ -> GodotMCPLocalRuntime autoload
+ -> live SceneTree
 ```
 
-Runtime Bridge 可以读取/修改运行中节点、调用方法、读取部分 Performance monitor，并 pause/resume SceneTree。Runtime 修改不会自动写回保存的编辑器 Scene。
+Runtime 修改默认只影响当前运行实例；只有额外执行 Editor 持久化操作时才会写回场景文件。
 
-插件被禁用时会清理保留的 autoload，并兼容 `res://` 和 Godot 4.7.2 `uid://` 引用。
-## 内置运行时
+## Screenshot
 
-当前 Windows runtime：
+Screenshot 以有边界的 MCP Image Content 返回，可覆盖支持的 Editor View、Camera3D/Cinematic View 和 Running Game，不提供任意桌面截图。
+
+## Diagnostics Helper
+
+`diagnostics.run_capture` 使用一个很小的 Windows Helper：
 
 ```text
-OpenAI tunnel-client
-version: 0.0.10+105e17a79a36e4e5c897fd698ed2b8dbf935b144
-SHA-256: D893D8127EEE35070D265C1BE29BFE008F8D9FCB476E7FEBF56C8FDC6C0615C8
+addons/godot_mcp_local/bin/windows/godot-mcp-runner.exe
 ```
 
-Apache-2.0 LICENSE 和 NOTICE 位于 `addons/godot_mcp_chatgpt/bin/`。
+源码位于 `tools/run-helper/`。它只负责启动有边界的 Godot 子进程、分别捕获 stdout/stderr、限制超时和输出大小，并返回结构化 JSON；完全不涉及 Tunnel 或凭据。
 
-## 开发测试桩
+## 安全边界
 
-`server/` 只用于开发，模拟足够的 OpenAI control plane 行为，让**官方** tunnel-client 能在本地完成端到端测试。
+这个本地 Server 不是远程管理服务。安全前提是：
 
-最有价值的 smoke 路径：
+1. MCP Client 与 Godot 在同一台机器；
+2. Listener 始终只在 Loopback；
+3. Command Layer 的路径限制和 Schema 校验保持启用；
+4. 不通过端口转发、反向代理、LAN 绑定或公网 Tunnel 暴露 Endpoint。
 
-```text
-control-plane stub
- -> 内置官方 tunnel-client.exe
- -> Godot loopback MCP
- -> 真实 Godot 4.7.2 GUI
- -> 47 个默认 Public Tools / 230 个 Internal Atomic Commands
-```
+若未来增加远程连接，必须先重新设计认证、授权、防重放、Origin、限流和独立威胁模型。
 
-0.5.0 已通过 Compact Catalogue/Schema 与代表性真实行为门禁；2026-09-10 最终真实 Web ChatGPT Connector 全能力回归结果为 `REAL_CHATGPT_GODOT_MCP_0_5_TEST=PASS`。
+## 非目标
 
-## 明确不做
-
-- 自建公网 Relay；
-- 再用 GDScript 直接实现 OpenAI `/poll` / `/response`；
-- 普通用户走 stdio MCP；
-- localhost WebSocket bridge；
-- 通用 Shell/桌面自动化；
-- 任意 OS 命令暴露；
-- 取代 Git 或完整 coding agent。
+- 公网 MCP Hosting；
+- OpenAI Secure MCP Tunnel 兼容；
+- 插件内 API Key / OAuth 管理；
+- 自动配置 MCP Client；
+- 通用 Shell / Desktop Automation；
+- 绕过命令层限制的任意文件系统访问；
+- 替代 Git 或 Coding Agent。

@@ -2,170 +2,128 @@
 
 [English](CONTRIBUTING.md) | 简体中文
 
-感谢你帮助改进 `godot-mcp-chatgpt`。
+感谢参与 `godot-mcp-local`。
 
-这个项目更看重：**小而清晰、可测试、能真正改善 Godot 工作流的改动**，而不是一次性堆大量未经验证的工具。
+## 项目范围
 
-## 什么贡献最有价值
-
-特别欢迎：
-
-- 其他 Godot 4.x 版本的可复现兼容性结果；
-- 有明确前后对比的 bug 修复；
-- 能解决真实编辑器工作流的新 MCP 工具；
-- 更好的错误信息和诊断；
-- 安全加固；
-- Windows 打包改进；
-- macOS/Linux 运行时支持；
-- 新用户视角的文档修正；
-- 能复现真实连接器问题的测试。
-
-## 做大功能前
-
-建议先开 Issue，并说明：
-
-1. 你在 Godot 里真正想完成什么；
-2. 当前工具为什么做不到或很麻烦；
-3. 最小需要新增什么能力；
-4. 它是只读、修改型还是破坏型；
-5. 如何在一次性测试项目中验证。
-
-这样可以避免 MCP 工具面不断膨胀，同时让模型更容易稳定选择正确工具。
-
-## 架构规则
-
-当前生产架构是有意设计的：
+本仓库是 **纯本地** Godot MCP 版本，正式拓扑只有：
 
 ```text
-ChatGPT
- -> OpenAI Secure MCP Tunnel
- -> 官方 OpenAI tunnel-client
- -> Godot loopback Streamable HTTP MCP
- -> Godot CommandRegistry
- -> Godot Editor API
+本地 MCP Client -> 127.0.0.1 Streamable HTTP MCP -> Godot Editor
 ```
 
-没有明确兼容性原因和架构讨论前，不要再用自定义 Tunnel 实现替换官方 tunnel-client。
-
-不要把 CWapi 加成运行时依赖。
-
-## 工具设计原则
-
-新工具应当：
-
-- 解决重复出现的真实用户工作流；
-- 名称和职责单一；
-- JSON Schema 尽量紧凑；
-- MCP annotations 必须真实；
-- 避免任意文件系统或 Shell 权限；
-- 适用时保持 `res://` 边界；
-- 返回结构化、可理解的错误；
-- 能在一次性场景/项目里安全测试；
-- 避免和已有工具只换名字重复实现。
-
-如果一个工作流天然属于一次操作，优先考虑有价值的批处理，而不是拆成大量往返调用。
+不要在没有独立架构方案的情况下重新加入公网 Relay、远程 Tunnel、API Key、账号登录或 Credential Store。远程连接明确不属于当前范围。
 
 ## 开发环境
 
-当前明确验证：
+主要验证目标：
+
+- Godot 4.7.2 Standard x64
+- Windows x64
+- GDScript
+- Loopback Streamable HTTP MCP
+
+主 Addon：
 
 ```text
-Windows x64
-Godot 4.7.2 Standard x64
-GDScript
+addons/godot_mcp_local/
 ```
 
-仓库 `server/` 下还有仅供开发使用的 TypeScript control-plane 测试桩。
-
-## 提交前测试
-
-有实质代码改动时，至少运行相关检查。
-
-Godot 脚本应在目标 Godot 版本下成功编译。
-
-测试桩：
+Diagnostics Helper 源码：
 
 ```text
-cd server
-npm install
-npm run build
-npm test
+tools/run-helper/
 ```
 
-如果修改了 Transport 或编辑器控制层，并且本地环境支持，还应跑真实 Godot GUI production smoke。
+## 开发前
 
-没有实际运行的测试，不要写成“已通过”。
+1. 阅读 [架构](docs/ARCHITECTURE.zh-CN.md)。
+2. 阅读 [安全策略](SECURITY.zh-CN.md)。
+3. 修改 Public Tool 前先检查实时 Schema。
+4. 不要把无关改动混入 Patch。
 
-## 文档
+## Public Tool 设计
 
-面向用户的文档应尽量保持英文 + 简体中文双语。
+本项目故意保持紧凑 MCP Surface。能放入现有 Domain / Rollup Tool 或 Internal Command 的能力，优先不要新增大量扁平 Tool。
 
-新增用户文档优先采用配对文件：
+Tool 修改应具备：
 
-```text
-NAME.md
-NAME.zh-CN.md
-```
+- 有边界的 Input Schema；
+- 正确 Read-only / Destructive Annotation；
+- 明确 Error Code / Message；
+- Project / Path Validation；
+- 回归覆盖；
+- Public Contract 变化时同步文档。
 
-翻译时命令、标识符、真实报错文本保持原样。
+实时 `tools/list` 是最终权威。
 
-除非仓库策略明确改变，否则不要添加装饰性截图、徽章、GIF 或其他图片。
+## 本地 Transport 规则
 
-## 开发进度记录规则
+除非经过明确设计评审，否则必须保持：
 
-对仓库开发任务来说，进度文档属于 Definition of Done 的一部分。
+- 只绑定 `127.0.0.1`；
+- 固定 `/mcp` Path；
+- 本地 Port 可配置；
+- Editor Mutation 串行；
+- JSON / SSE 兼容；
+- 拒绝 Browser-origin Request；
+- 因为不支持远程 Listener，所以不做远程认证。
 
-每完成一个逻辑独立任务后：
+绝不能静默扩大到 LAN / Public Listener。
 
-1. 先执行对应的目标验证；
-2. 如果存在 Active Version，更新对应 `docs/DEVELOPMENT_<version>.md` 追踪文档；
-3. 更新 `docs/PROGRESS.md`，记录真实结果和当前下一优先方向；
-4. 同步简体中文版本；
-5. 然后才能进入下一项任务。
+## 文件与 Runtime 边界
 
-只写完代码但没有完成验证和进度更新，仍然属于开发中状态。
+- Project 文件操作继续受现有 `res://` 限制。
+- 不增加任意 Shell Execution。
+- Screenshot 只覆盖支持的 Godot View。
+- Runtime Tool 使用 Debugger / Runtime Bridge，不新开额外公网服务。
+- 已有支持 Undo/Redo 的 Editor Mutation 应继续保留。
 
-详细规则见 [开发工作流](docs/DEVELOPMENT_WORKFLOW.zh-CN.md)。
-## 安全
+## Diagnostics Helper
 
-永远不要提交：
+如果修改 `tools/run-helper/`：
 
-- Runtime API Key；
-- Tunnel 凭据；
-- Shard Token；
-- 含秘密的生成 profile；
-- 只用于本地测试的私人项目数据。
+1. 重新 Build Windows `godot-mcp-runner.exe`；
+2. 放到 `addons/godot_mcp_local/bin/windows/`；
+3. 验证 `diagnostics.run_capture` 仍返回有边界的结构化结果；
+4. 在变更记录中写明实际测试。
 
-修改鉴权、本地 HTTP、文件系统工具或进程启动前，请读 [SECURITY.zh-CN.md](SECURITY.zh-CN.md)。
+## 最低验证要求
 
-## PR 范围
+Transport / Addon 改动至少执行：
 
-小 PR 更容易评审。尽量不要在一个 PR 里混合：
+1. Addon GDScript Load / Parse；
+2. 真实 Godot Editor Plugin Load；
+3. Loopback Listener；
+4. MCP `initialize`；
+5. MCP `tools/list` 与 Tool Name 唯一性；
+6. 代表性只读调用，例如 `godot.get_status`；
+7. JSON Response；
+8. SSE Response；
+9. Browser-origin Reject；
+10. `git diff --check`。
 
-- Transport 重构；
-- 大量工具扩展；
-- 文档整体重做；
-- 无关格式调整。
+Command 改动还要补对应 Domain 的代表性行为测试。
 
-除非它们确实不可分割。
+没有真实执行过的测试不能写 PASS。
 
-## Bug 报告
+## Git 整洁
 
-高质量报告建议包含：
+- `.godot/` 不进入 Git。
+- 临时 Smoke Project / Log 不提交。
+- 不把无关游戏 Demo 内容提交进来。
+- Binary 必须是明确需要且有说明的。
+- Commit Message 保持聚焦。
 
-```text
-操作系统：
-Godot 版本：
-插件版本/commit：
-面板到 connected：是/否
-ChatGPT 连接器创建：是/否
-发现工具数量：
-最小复现：
-完整但不含秘密的报错：
-```
+## Issue / PR
 
-不要提交任何凭据。
+高质量报告应包含：
 
-## License
+- Godot Version / OS；
+- 准确复现步骤；
+- 涉及的 MCP Tool / Request；
+- Expected / Actual；
+- 非敏感日志；
+- 问题属于 Editor、Runtime、Transport、Screenshot、Diagnostics 还是 Custom Tool。
 
-提交贡献即表示你同意贡献内容按本仓库项目许可证提供。第三方代码必须保留原有许可证和 attribution 要求。
+安全问题按 [SECURITY.zh-CN.md](SECURITY.zh-CN.md) 处理。
