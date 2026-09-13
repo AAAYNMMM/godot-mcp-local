@@ -4,6 +4,22 @@
 
 本 Changelog 记录已经发布的用户可见里程碑和会影响兼容性的变化。
 
+## 0.1.1 — Windows 一键安装器
+
+日期：2026-09-13
+
+- 新增独立 Windows x64 一键安装器，使用原生 `project.godot` 文件选择器。
+- 安装器内嵌完整 `addons/godot_mcp_local/`，可自动安装/原地升级并启用 Editor Plugin。
+- 保留项目里其他已经启用的 Godot 插件。
+- 新增重复安装/升级回归测试和 SHA-256 Release 产物。
+
+## 0.1.0 — 本地 Codex Transport
+
+日期：2026-09-13
+
+- 将原 Godot MCP 能力面改造成纯本地 Loopback Streamable HTTP MCP，面向 Codex / 本地 MCP Client。
+- 删除 Secure MCP Tunnel、API Key/凭据流程、Tunnel Runtime、Control Plane Harness 和远程 Transport 依赖。
+
 ## 0.1.0 — 纯本地 Codex MCP 转换
 
 日期：2026-09-13

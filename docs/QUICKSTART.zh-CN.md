@@ -12,6 +12,14 @@
 
 ## 1. 安装插件
 
+### 推荐：Windows 一键安装器
+
+从 GitHub Release 下载 `godot-mcp-local-v0.1.1-windows-x64-installer.exe`，运行后选择目标项目的 `project.godot`。安装器会自动安装/升级插件并启用 **Godot MCP Local**，同时保留项目里其他已启用插件。
+
+如果项目已经在 Godot 中打开，安装完成后重新打开项目。
+
+### 手动安装
+
 把：
 
 ```text

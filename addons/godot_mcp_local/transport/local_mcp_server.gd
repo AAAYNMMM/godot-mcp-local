@@ -4,7 +4,7 @@ extends Node
 signal log_message(message: String)
 signal state_changed(state: String)
 
-const PLUGIN_VERSION := "0.1.0"
+const PLUGIN_VERSION := "0.1.1"
 const CLIENT_NAME := "godot-mcp-local"
 const MCP_PROTOCOL_VERSION := "2025-11-25"
 const MCP_SUPPORTED_VERSIONS := ["2026-07-28", "2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"]

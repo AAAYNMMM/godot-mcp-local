@@ -8,3 +8,5 @@
 dist/
 .godot-mcp-stdout.log
 .godot-mcp-stderr.log
+
+tools/installer/payload.zip

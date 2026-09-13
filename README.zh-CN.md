@@ -42,6 +42,19 @@ Server 只绑定 `127.0.0.1`。默认端口为 `39050`，可以在 Godot 底部 
 
 ## 安装
 
+### Windows 一键安装器
+
+从 GitHub Release 下载 `godot-mcp-local-v0.1.1-windows-x64-installer.exe`，双击运行，然后选择目标项目的 `project.godot`。安装器会自动：
+
+- 安装或升级 `addons/godot_mcp_local/`；
+- 在 `project.godot` 中启用 **Godot MCP Local**；
+- 保留项目里其他已经启用的 Godot 插件；
+- 允许以后直接再次运行安装器原地升级。
+
+如果项目已经在 Godot 中打开，安装后重新打开项目，让新的插件文件干净加载。
+
+### 手动安装
+
 把下面目录复制到目标 Godot 项目：
 
 ```text
@@ -106,6 +119,8 @@ JSON Response               PASS
 SSE Response                PASS
 浏览器 Origin 拒绝          PASS（403）
 GDScript 加载检查            PASS（29 scripts / 0 failures）
+Windows 安装器构建           PASS
+安装 / 原地升级 E2E          PASS
 ```
 
 `diagnostics.run_capture` 仍保留一个很小的本地 Windows Runner，源码位于 `tools/run-helper/`，与 Tunnel 无关。

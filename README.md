@@ -42,6 +42,19 @@ See [Tool Reference](docs/TOOL_REFERENCE.md).
 
 ## Install
 
+### Windows one-click installer
+
+Download `godot-mcp-local-v0.1.1-windows-x64-installer.exe` from the GitHub Release and double-click it. Select the target project's `project.godot` file. The installer:
+
+- installs or upgrades `addons/godot_mcp_local/`;
+- enables **Godot MCP Local** in `project.godot`;
+- preserves other enabled Godot plugins;
+- can be run again to upgrade the addon in place.
+
+If the project is already open in Godot, close/reopen it after installation so the new plugin files load cleanly.
+
+### Manual install
+
 Copy this folder into the target Godot project:
 
 ```text
@@ -104,6 +117,8 @@ JSON response                PASS
 SSE response                 PASS
 browser Origin rejection     PASS (403)
 GDScript load check          PASS (29 scripts / 0 failures)
+Windows installer build       PASS
+installer install/upgrade E2E PASS
 ```
 
 The `diagnostics.run_capture` helper is kept as a small bundled local Windows executable and is built from `tools/run-helper/`.

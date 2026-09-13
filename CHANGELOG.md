@@ -4,6 +4,22 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 This changelog records released user-facing milestones and compatibility-impacting changes.
 
+## 0.1.1 — Windows one-click installer
+
+Date: 2026-09-13
+
+- Added a standalone Windows x64 installer with a native `project.godot` picker.
+- The installer embeds the complete `addons/godot_mcp_local/` payload, installs/upgrades it in place, and enables the editor plugin automatically.
+- Existing enabled Godot plugins are preserved.
+- Added repeat-install/upgrade regression coverage and SHA-256 release artifacts.
+
+## 0.1.0 — Local Codex transport
+
+Date: 2026-09-13
+
+- Forked the prior Godot MCP tool surface into a pure loopback Streamable HTTP MCP addon for Codex/local clients.
+- Removed the Secure MCP Tunnel, API-key/credential flow, tunnel runtime, control-plane harness, and remote transport requirements.
+
 ## 0.1.0 — Local-only Codex MCP conversion
 
 Date: 2026-09-13
