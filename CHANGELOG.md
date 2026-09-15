@@ -4,6 +4,15 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 This changelog records released user-facing milestones and compatibility-impacting changes.
 
+## 0.1.2 — Codex MCP handshake fix
+
+Date: 2026-09-15
+
+- Fixed numeric JSON-RPC request IDs being returned as floats (`0.0` instead of `0`). Godot's JSON parser converts numbers to floats, which caused Codex's Rust MCP client to reject the initialize response with `connection closed: initialize response`.
+- Normalize integer-valued request IDs before dispatch so both successful and error responses preserve their integer type in JSON and SSE. String IDs remain unchanged.
+- Added `python tools/test_transport.py` to cover ID types, initialization, tool discovery/calls, SSE framing, and browser-origin rejection against a running editor.
+- When upgrading, close Godot before replacing the addon and reopen the project afterward. Reloading the running transport from its own MCP request can terminate the editor.
+
 ## 0.1.1 — Windows one-click installer
 
 Date: 2026-09-13

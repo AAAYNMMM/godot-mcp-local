@@ -42,6 +42,16 @@ When changing `transport/local_mcp_server.gd` or connection UI, verify:
 - editor mutations remain serialized;
 - no remote/tunnel credential path has been introduced.
 
+With the editor plugin running, execute the stdlib-only regression check:
+
+```sh
+python tools/test_transport.py --url http://127.0.0.1:39050/mcp
+```
+
+The check verifies the exact JSON type of numeric and string request IDs in JSON/SSE success and error responses. Checking only HTTP 200 or numeric equality would miss `0` being changed to `0.0`, which breaks Codex's MCP client.
+
+After replacing the transport script, restart the editor before testing. Do not reload the active transport from its own MCP request.
+
 ## Tool changes
 
 For a changed tool/domain:

@@ -4,6 +4,15 @@
 
 本 Changelog 记录已经发布的用户可见里程碑和会影响兼容性的变化。
 
+## 0.1.2 — 修复 Codex MCP 握手失败
+
+日期：2026-09-15
+
+- 修复数字 JSON-RPC 请求 ID 被回传为浮点数的问题（例如 `0` 变成 `0.0`）。Godot 的 JSON 解析器会将数字转成浮点数，导致 Codex 的 Rust MCP 客户端拒绝初始化响应，报出 `connection closed: initialize response`。
+- 在分派请求前还原整数 ID，覆盖 JSON / SSE 的成功与错误响应；字符串 ID 保持不变。
+- 新增 `python tools/test_transport.py`，连接真实编辑器检查 ID 类型、初始化、工具发现与调用、SSE 消息完整性和浏览器来源拒绝。
+- 升级时请先关闭 Godot，替换插件后重新打开项目。通过正在运行的 MCP 请求重新加载其传输脚本，可能导致编辑器退出。
+
 ## 0.1.1 — Windows 一键安装器
 
 日期：2026-09-13

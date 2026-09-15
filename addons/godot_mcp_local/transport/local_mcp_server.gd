@@ -4,7 +4,7 @@ extends Node
 signal log_message(message: String)
 signal state_changed(state: String)
 
-const PLUGIN_VERSION := "0.1.1"
+const PLUGIN_VERSION := "0.1.2"
 const CLIENT_NAME := "godot-mcp-local"
 const MCP_PROTOCOL_VERSION := "2025-11-25"
 const MCP_SUPPORTED_VERSIONS := ["2026-07-28", "2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"]
@@ -214,6 +214,9 @@ func _handle_http_request(request: Dictionary) -> void:
 
 func _dispatch_jsonrpc(rpc: Dictionary) -> Dictionary:
 	var rpc_id = rpc.get("id")
+	# JSON.parse_string turns numbers into floats; MCP clients require integer IDs.
+	if rpc_id is float and rpc_id == floor(rpc_id):
+		rpc_id = int(rpc_id)
 	if str(rpc.get("jsonrpc", "")) != "2.0" or not rpc.has("method"):
 		return _rpc_error(rpc_id, -32600, "Invalid Request")
 	var method := str(rpc.get("method", ""))

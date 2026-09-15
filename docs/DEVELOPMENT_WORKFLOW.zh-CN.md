@@ -42,6 +42,16 @@
 - Editor Mutation 仍串行；
 - 没有重新引入远程 / Tunnel Credential Path。
 
+编辑器插件运行时，执行只依赖 Python 标准库的回归检查：
+
+```sh
+python tools/test_transport.py --url http://127.0.0.1:39050/mcp
+```
+
+检查覆盖 JSON / SSE 成功与错误响应中数字及字符串请求 ID 的精确类型。仅检查 HTTP 200 或数字相等会漏掉 `0` 变成 `0.0` 的问题，这会导致 Codex MCP 客户端无法握手。
+
+替换传输脚本后，重新启动编辑器再测试。不要通过正在运行的 MCP 请求重新加载传输脚本本身。
+
 ## Tool 修改
 
 对受影响 Tool / Domain：

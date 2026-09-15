@@ -44,14 +44,14 @@ See [Tool Reference](docs/TOOL_REFERENCE.md).
 
 ### Windows one-click installer
 
-Download `godot-mcp-local-v0.1.1-windows-x64-installer.exe` from the GitHub Release and double-click it. Select the target project's `project.godot` file. The installer:
+Download `godot-mcp-local-v0.1.2-windows-x64-installer.exe` from the GitHub Release and double-click it. Select the target project's `project.godot` file. The installer:
 
 - installs or upgrades `addons/godot_mcp_local/`;
 - enables **Godot MCP Local** in `project.godot`;
 - preserves other enabled Godot plugins;
 - can be run again to upgrade the addon in place.
 
-If the project is already open in Godot, close/reopen it after installation so the new plugin files load cleanly.
+Close Godot before installing or replacing addon files, then reopen the project. Do not hot-reload the active MCP transport from its own request.
 
 ### Manual install
 

@@ -14,9 +14,9 @@ No OpenAI tunnel, API key, browser connector, Node server, or Python server is r
 
 ### Recommended: Windows one-click installer
 
-Download `godot-mcp-local-v0.1.1-windows-x64-installer.exe` from the GitHub Release, run it, and select the target `project.godot`. It installs/upgrades the addon and enables **Godot MCP Local** automatically while preserving other enabled plugins.
+Download `godot-mcp-local-v0.1.2-windows-x64-installer.exe` from the GitHub Release, run it, and select the target `project.godot`. It installs/upgrades the addon and enables **Godot MCP Local** automatically while preserving other enabled plugins.
 
-If the project is already open in Godot, reopen it after the installer finishes.
+Close Godot before installing or replacing addon files, then reopen the project. Do not hot-reload the active MCP transport from its own request.
 
 ### Manual install
 
